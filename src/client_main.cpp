@@ -5,7 +5,7 @@ using std::cout;
 using std::endl;
 using std::string;
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     if (argc != 2) {
         std::cerr << "Bad url" << std::endl;
@@ -13,5 +13,4 @@ int main(int argc, char* argv[])
     }
     string url = argv[1];
     cout << url << endl;
-    
 }
