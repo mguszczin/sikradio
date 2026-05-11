@@ -4,17 +4,14 @@
 #include <chrono>
 #include <string>
 
+#include "url.h"
+
 namespace program_arguments {
 
-#include <string>
-#include <chrono>
+using url::ParsedUrl;
 
 struct ProgramArguments {
-    enum class IpType {
-        IPv4,
-        IPv6,
-        Default
-    };
+    enum class IpType { IPv4, IPv6, Default };
 
     enum class Verbosity {
         Quiet,   // V0
@@ -24,11 +21,11 @@ struct ProgramArguments {
         Debug    // V4
     };
 
-    std::string url_address;
-    
+    ParsedUrl url_address;
+
     IpType ip = IpType::Default;
     Verbosity verb = Verbosity::Warning;
-    
+
     bool multiplex = false;
 
     std::chrono::milliseconds timeout{5000};
@@ -36,6 +33,6 @@ struct ProgramArguments {
 
 // [[nodiscard]] ProgramArguments get_args(int argc, char *argv[]);
 
-}
+} // namespace program_arguments
 
 #endif
