@@ -7,17 +7,12 @@
 namespace url {
 
 struct ParsedUrl {
-
-    static constexpr uint16_t HTTP_PORT = 80;
-    static constexpr uint16_t HTTPS_PORT = 443;
-
-    bool is_https = false;
-    std::string domain = "";
+    std::string address;
     uint16_t port;
-    std::string resource;
+    std::string path;
 };
 
-// [[nodiscard]] ParsedUrl parse_url(std::string &url);
+[[nodiscard]] ParsedUrl parse_url(const std::string &url);
 
 } // namespace url
 
