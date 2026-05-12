@@ -10,16 +10,17 @@ namespace program_arguments {
 
 using url::ParsedUrl;
 
-struct ProgramArguments {
-    enum class IpType { IPv4, IPv6, Default };
+enum class IpType { IPv4, IPv6, Default };
 
-    enum class Verbosity {
-        Quiet,   // V0
-        Error,   // V1
-        Warning, // V2
-        Info,    // V3
-        Debug    // V4
-    };
+enum class Verbosity {
+    Quiet,   // V0
+    Error,   // V1
+    Warning, // V2
+    Info,    // V3
+    Debug    // V4
+};
+
+struct ProgramArguments {
 
     ParsedUrl url_address;
 
@@ -31,7 +32,7 @@ struct ProgramArguments {
     std::chrono::milliseconds timeout{5000};
 };
 
-// [[nodiscard]] ProgramArguments get_args(int argc, char *argv[]);
+[[nodiscard]] ProgramArguments get_args(int argc, char *argv[]);
 
 } // namespace program_arguments
 
