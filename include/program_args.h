@@ -27,7 +27,7 @@ struct ProgramArguments {
     IpType ip = IpType::Default;
     Verbosity verb = Verbosity::Warning;
 
-    bool multiplex = false;
+    bool is_multiplexing = false;
 
     std::chrono::milliseconds timeout{5000};
 };

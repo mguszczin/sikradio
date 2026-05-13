@@ -93,7 +93,10 @@ Url parse_url(string_view url)
         path = "/";
 
     // 4. Return the fully parsed URL
-    return Url{.address = address, .port = port, .path = string{path}};
+    return Url{.address = address,
+               .port = port,
+               .path = string{path},
+               .is_https = is_https};
 }
 
 } // namespace url

@@ -4,6 +4,10 @@
 #include "program_args.h"
 #include "url.h"
 
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
 namespace client {
 
 using program_arguments::ProgramArguments;
@@ -12,6 +16,8 @@ using url::Url;
 class RadioClient {
   private:
     ProgramArguments radio_args;
+
+    void set_up_addrinfo(struct addrinfo &hints) const;
 
     /**
      * Establishes connection with server under `cur_url`

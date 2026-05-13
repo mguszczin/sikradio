@@ -11,6 +11,7 @@ struct Url {
     std::string address;
     uint16_t port;
     std::string path;
+    bool is_https;
 };
 
 [[nodiscard]] Url parse_url(std::string_view url);

@@ -67,7 +67,7 @@ ProgramArguments get_args(int argc, char *argv[])
     string url_str{};
     IpType type = IpType::Default;
     Verbosity verb = Verbosity::Warning;
-    bool multiplex = true;
+    bool is_multiplexing = true;
     milliseconds timeout{5000};
 
     opterr = 0;
@@ -79,7 +79,7 @@ ProgramArguments get_args(int argc, char *argv[])
             break;
 
         case 'm':
-            multiplex = true;
+            is_multiplexing = true;
             break;
 
         case 't':
@@ -128,7 +128,7 @@ ProgramArguments get_args(int argc, char *argv[])
     return ProgramArguments{.url_address = url::parse_url(url_str),
                             .ip = type,
                             .verb = verb,
-                            .multiplex = multiplex,
+                            .is_multiplexing = is_multiplexing,
                             .timeout = timeout};
 }
 
