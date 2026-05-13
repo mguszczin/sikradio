@@ -8,7 +8,7 @@
 
 namespace program_arguments {
 
-using url::ParsedUrl;
+using url::Url;
 
 enum class IpType { IPv4, IPv6, Default };
 
@@ -22,7 +22,7 @@ enum class Verbosity {
 
 struct ProgramArguments {
 
-    ParsedUrl url_address;
+    Url url_address;
 
     IpType ip = IpType::Default;
     Verbosity verb = Verbosity::Warning;

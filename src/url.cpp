@@ -73,7 +73,7 @@ pair<string, uint16_t> get_address_and_port(string_view host_port,
 
 namespace url {
 
-ParsedUrl parse_url(string_view url)
+Url parse_url(string_view url)
 {
     static constexpr uint16_t HTTP_PORT = 80;
     static constexpr uint16_t HTTPS_PORT = 443;
@@ -93,7 +93,7 @@ ParsedUrl parse_url(string_view url)
         path = "/";
 
     // 4. Return the fully parsed URL
-    return ParsedUrl{.address = address, .port = port, .path = string{path}};
+    return Url{.address = address, .port = port, .path = string{path}};
 }
 
 } // namespace url
