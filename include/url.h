@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace url {
 
@@ -12,7 +13,7 @@ struct ParsedUrl {
     std::string path;
 };
 
-[[nodiscard]] ParsedUrl parse_url(const std::string &url);
+[[nodiscard]] ParsedUrl parse_url(std::string_view url);
 
 } // namespace url
 

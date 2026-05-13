@@ -18,36 +18,42 @@ using std::chrono::milliseconds;
 
 milliseconds parse_timeout(const string &arg)
 {
-    static constexpr int MIN_TIME = 100, MAX_TIME = 100000;
+    static constexpr int MIN_TIME = 100;
+    static constexpr int MAX_TIME = 100000;
+    int timeout_val{};
+
     try {
-        int timeout_val = stoi(arg);
-        if (timeout_val < MIN_TIME || timeout_val > MAX_TIME) {
-            throw invalid_argument(
-                format("Option -t: timeout must be between {} and {} ms.",
-                       MIN_TIME, MAX_TIME));
-        }
-        return milliseconds(timeout_val);
+        timeout_val = stoi(arg);
     } catch (const logic_error &) {
         throw invalid_argument("Option -t requires a numeric value.");
     }
+
+    if (timeout_val < MIN_TIME || timeout_val > MAX_TIME) {
+        throw invalid_argument(
+            format("Option -t: timeout must be between {} and {} ms.", MIN_TIME,
+                   MAX_TIME));
+    }
+    return milliseconds(timeout_val);
 }
 
 Verbosity parse_verbosity(const string &arg)
 {
     static constexpr int MIN_VERB = 0;
     static constexpr int MAX_VERB = 4;
+    int v_val{};
 
     try {
         int v_val = stoi(arg);
-        if (v_val < MIN_VERB || v_val > MAX_VERB) {
-            throw invalid_argument(
-                format("Option -v: verbosity must be between {} and {}.",
-                       MIN_VERB, MAX_VERB));
-        }
-        return static_cast<Verbosity>(v_val);
     } catch (const logic_error &) {
         throw invalid_argument("Option -v requires a numeric value.");
     }
+
+    if (v_val < MIN_VERB || v_val > MAX_VERB) {
+        throw invalid_argument(
+            format("Option -v: verbosity must be between {} and {}.", MIN_VERB,
+                   MAX_VERB));
+    }
+    return static_cast<Verbosity>(v_val);
 }
 
 } // namespace
