@@ -1,12 +1,16 @@
 #include "radio_client.h"
 
 #include <array>
+#include <cerrno>
 #include <cstring>
+#include <deque>
 #include <format>
+#include <iostream>
 #include <optional>
 #include <stdexcept>
 
 #include <netdb.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -18,31 +22,21 @@ namespace {
 using program_arguments::IpType;
 using program_arguments::Verbosity;
 
+using std::array;
+using std::cerr;
+using std::cin;
+using std::deque;
+using std::endl;
 using std::format;
+using std::generic_category;
+using std::getline;
 using std::optional;
 using std::runtime_error;
 using std::string;
+using std::system_error;
 using std::to_string;
 
 using url::Url;
-
-string get_http_request_string(const Url &url, bool is_multiplex,
-                               std::optional<std::string> cookie)
-{
-    string cookie_header =
-        cookie.has_value() ? std::format("Cookie: {}\r\n", cookie.value()) : "";
-
-    string icy_header = is_multiplex ? "Icy-MetaData: 1\r\n" : "";
-
-    return format("GET {} HTTP/1.1\r\n"
-                  "Host: {}\r\n"
-                  "Connection: Keep-Alive\r\n"
-                  "{}"
-                  "{}"
-                  "\r\n",
-                  url.path, url.address, cookie_header, icy_header);
-}
-
 } // namespace
 
 namespace client {
@@ -123,8 +117,57 @@ int RadioClient::find_radio_server(const Url &url) const
 
 void RadioClient::start()
 {
-    std
-    // some kind of polling
+    static constexpr size_t INPUT_FD = 0, SERVER_FD = 1;
+    Url cur_url = radio_args.url_address;
+    array<struct pollfd, LISTENING_POINTS> poll_fds{};
+
+    ClientModes cur_mode = ClientModes::SendingData;
+
+    poll_fds[0].fd = STDIN_FILENO;
+    poll_fds[0].events = POLLIN;
+
+    poll_fds[1].fd = establish_connection(cur_url);
+    poll_fds[1].events = POLLOUT;
+
+    std::array<char, BUFFER_SIZE> audio_buffer;
+
+    while (1) {
+        int status = poll(poll_fds.data(), poll_fds.size(), radio_args.timeout);
+
+        if (status < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            throw system_error(errno, generic_category(),
+                               "Krytyczny błąd funkcji poll");
+        }
+
+        if (status == 0) {
+            // handle_timeout();
+            continue;
+        }
+
+        if (POLLIN & poll_fds[INPUT_FD].revents) {
+            string line;
+            if (getline(cin, line)) {
+                if (line == QUIT_MESSAGE) {
+                    break;
+                } else if (radio_args.verb == Verbosity::Debug) {
+                    cerr << line << endl;
+                }
+            } else {
+                // this is not the expected behaviour remember that when
+                // return you must close desc
+                break;
+            }
+        }
+
+        bool should_break{};
+        if (ClientModes::ReadingData)
+            should_break = handle_read(poll_fds);
+        else
+            should_break = handle_write(poll_fds);
+    }
 }
 
 } // namespace client

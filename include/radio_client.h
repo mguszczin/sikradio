@@ -15,6 +15,12 @@ using url::Url;
 
 class RadioClient {
   private:
+    static constexpr size_t LISTENING_POINTS = 2;
+    static constexpr size_t BUFFER_SIZE = 4096;
+    static constexpr std::string QUIT_MESSAGE = "quit";
+
+    enum class ClientModes { SendingData, ReadingData };
+
     ProgramArguments radio_args;
 
     void set_up_addrinfo(struct addrinfo &hints) const;

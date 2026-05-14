@@ -1,7 +1,6 @@
 #ifndef PROGRAM_ARGS_H
 #define PROGRAM_ARGS_H
 
-#include <chrono>
 #include <string>
 
 #include "url.h"
@@ -29,7 +28,7 @@ struct ProgramArguments {
 
     bool is_multiplexing = false;
 
-    std::chrono::milliseconds timeout{5000};
+    int timeout{5000};
 };
 
 [[nodiscard]] ProgramArguments get_args(int argc, char *argv[]);

@@ -1,5 +1,6 @@
 #include "program_args.h"
 
+#include <format>
 #include <stdexcept>
 #include <string>
 #include <unistd.h>
@@ -14,9 +15,8 @@ using std::invalid_argument;
 using std::logic_error;
 using std::stoi;
 using std::string;
-using std::chrono::milliseconds;
 
-milliseconds parse_timeout(const string &arg)
+int parse_timeout(const string &arg)
 {
     static constexpr int MIN_TIME = 100;
     static constexpr int MAX_TIME = 100000;
@@ -33,7 +33,7 @@ milliseconds parse_timeout(const string &arg)
             format("Option -t: timeout must be between {} and {} ms.", MIN_TIME,
                    MAX_TIME));
     }
-    return milliseconds(timeout_val);
+    return timeout_val;
 }
 
 Verbosity parse_verbosity(const string &arg)
@@ -68,7 +68,7 @@ ProgramArguments get_args(int argc, char *argv[])
     IpType type = IpType::Default;
     Verbosity verb = Verbosity::Warning;
     bool is_multiplexing = true;
-    milliseconds timeout{5000};
+    int timeout{5000};
 
     opterr = 0;
 
