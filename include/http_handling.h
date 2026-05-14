@@ -14,18 +14,21 @@ using std::string_view;
 
 using url::Url;
 
+inline constexpr string_view CRLF = "\r\n";
+
 enum class ParsedStatus { HTTP_OK, HTTP_MOVED, FAILED_TO_PARSE };
 
-struct ParsedHttp {
+struct ParsedHttpResponse {
     ParsedStatus status;
     optional<Url> url;
     optional<string> cookie;
+    optional<size_t> icy_metaint;
 };
 
-ParsedHttp parse_http_request(string_view http_request);
+[[nodiscard]] ParsedHttpResponse parse_http_response(string_view http_request);
 
-string get_http_request_string(const Url &url, bool is_multiplex,
-                               optional<string> cookie);
+[[nodiscard]] string get_http_request_string(const Url &url, bool is_multiplex,
+                                             optional<string> cookie);
 
 } // namespace http
 
