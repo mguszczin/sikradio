@@ -1,5 +1,7 @@
 #include "http_handling.h"
 
+#include <algorithm>
+#include <charconv>
 #include <format>
 #include <optional>
 #include <stdexcept>
@@ -9,12 +11,19 @@
 
 namespace {
 
+using std::errc;
 using std::format;
+using std::from_chars;
 using std::invalid_argument;
 using std::nullopt;
+using std::stoull;
+using std::string;
 using std::string_view;
+using std::transform;
 
 using http::CRLF;
+using http::DOUBLE_CRLF;
+using http::ParsedHttpResponse;
 using http::ParsedStatus;
 
 ParsedStatus check_response_line_parts(string_view protocol,
@@ -65,16 +74,97 @@ ParsedStatus parse_response_line(string_view response_line) noexcept
         return ParsedStatus::FAILED_TO_PARSE;
     }
 
-    if (line.find(' ', second_space + 1) != string_view::npos) {
-        return ParsedStatus::FAILED_TO_PARSE;
-    }
-
     string_view protocol = line.substr(0, first_space);
     string_view status_code =
         line.substr(first_space + 1, second_space - first_space - 1);
     string_view reason_phrase = line.substr(second_space + 1);
 
     return check_response_line_parts(protocol, status_code, reason_phrase);
+}
+
+string to_lower_string(string_view sv)
+{
+    string result(sv);
+    transform(result.begin(), result.end(), result.begin(),
+              [](unsigned char c) { return tolower(c); });
+    return result;
+}
+
+string_view strip(string_view sv)
+{
+    constexpr string_view whitespace = " \t\r";
+
+    size_t start = sv.find_first_not_of(whitespace);
+    if (start == string_view::npos) {
+        return {};
+    }
+
+    size_t end = sv.find_last_not_of(whitespace);
+    return sv.substr(start, end - start + 1);
+}
+
+void process_header(ParsedHttpResponse &result, string_view key,
+                    string_view value)
+{
+    static constexpr string_view HEADER_LOCATION = "location";
+    static constexpr string_view HEADER_SET_COOKIE = "set-cookie";
+    static constexpr string_view HEADER_ICY_METAINT = "icy-metaint";
+
+    key = strip(key);
+    value = strip(value);
+
+    if (key.empty()) {
+        return;
+    }
+
+    string key_lower = to_lower_string(key);
+
+    if (key_lower == HEADER_LOCATION) {
+        result.location = string(value);
+    } else if (key_lower == HEADER_SET_COOKIE) {
+        result.cookie = string(value);
+    } else if (key_lower == HEADER_ICY_METAINT) {
+        size_t metaint_val;
+
+        auto [ptr, ec] =
+            from_chars(value.data(), value.data() + value.size(), metaint_val);
+
+        if (ec == errc()) {
+            result.icy_metaint = metaint_val;
+        }
+    }
+}
+
+[[nodiscard]] ParsedHttpResponse parse_headers(string_view headers,
+                                               ParsedStatus status)
+{
+    ParsedHttpResponse result;
+    result.status = status;
+
+    size_t current_pos = 0;
+
+    while (current_pos < headers.size()) {
+        size_t next_crlf = headers.find(CRLF, current_pos);
+
+        if (next_crlf == string_view::npos || next_crlf == current_pos) {
+            break;
+        }
+
+        string_view header_line =
+            headers.substr(current_pos, next_crlf - current_pos);
+        size_t colon_pos = header_line.find(':');
+
+        if (colon_pos != string_view::npos) {
+            string_view key = header_line.substr(0, colon_pos);
+            string_view value = header_line.substr(colon_pos + 1);
+
+            process_header(result, key, value);
+        }
+
+        current_pos = next_crlf + CRLF.size();
+    }
+
+    return result;
 }
 
 } // namespace
@@ -85,12 +175,13 @@ namespace http {
 {
     static const ParsedHttpResponse WRONG_PARSE = {
         ParsedStatus::FAILED_TO_PARSE, nullopt, nullopt, nullopt};
-    size_t first_crlf = http_response.find(CRLF);
 
-    if (first_crlf == string_view::npos) {
+    size_t end_of_headers = http_response.find(DOUBLE_CRLF);
+    if (end_of_headers == string_view::npos) {
         return WRONG_PARSE;
     }
 
+    size_t first_crlf = http_response.find(CRLF);
     string_view first_line = http_response.substr(0, first_crlf + 2);
     ParsedStatus status = parse_response_line(first_line);
 
@@ -98,9 +189,12 @@ namespace http {
         return WRONG_PARSE;
     }
 
-    string_view headers_text = http_response.substr(first_crlf + 2);
+    size_t headers_start = first_crlf + 2;
+    size_t headers_len = end_of_headers + DOUBLE_CRLF.size() - headers_start;
 
-    return parse_headers(headers_text, status);
+    string_view headers = http_response.substr(headers_start, headers_len);
+
+    return parse_headers(headers, status);
 }
 
 [[nodiscard]] string get_http_request_string(const Url &url, bool is_multiplex,

@@ -15,12 +15,13 @@ using std::string_view;
 using url::Url;
 
 inline constexpr string_view CRLF = "\r\n";
+inline constexpr string_view DOUBLE_CRLF = "\r\n\r\n";
 
 enum class ParsedStatus { HTTP_OK, HTTP_MOVED, FAILED_TO_PARSE };
 
 struct ParsedHttpResponse {
     ParsedStatus status;
-    optional<Url> url;
+    optional<string> location;
     optional<string> cookie;
     optional<size_t> icy_metaint;
 };
