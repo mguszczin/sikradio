@@ -9,6 +9,7 @@
 #include <optional>
 #include <stdexcept>
 
+#include <fcntl.h>
 #include <netdb.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -59,6 +60,24 @@ void RadioClient::set_up_addrinfo(struct addrinfo &hints) const
     }
 }
 
+int RadioClient::find_matching_address(
+    const struct addrinfo *res) const noexcept
+{
+    int sockfd{-1};
+    for (const struct addrinfo *p = res; p != nullptr; p = p->ai_next) {
+        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (sockfd == -1)
+            continue;
+
+        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0)
+            break;
+
+        close(sockfd);
+        sockfd = -1;
+    }
+    return sockfd;
+}
+
 int RadioClient::establish_connection(const Url &url) const
 {
     struct addrinfo hints, *res;
@@ -75,18 +94,7 @@ int RadioClient::establish_connection(const Url &url) const
                                    gai_strerror(status)));
     }
 
-    int sockfd{-1};
-    for (struct addrinfo *p = res; p != nullptr; p = p->ai_next) {
-        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sockfd == -1)
-            continue;
-
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0)
-            break;
-
-        close(sockfd);
-        sockfd = -1;
-    }
+    int sockfd = find_matching_address(res);
     freeaddrinfo(res);
 
     if (sockfd == -1) {
@@ -94,25 +102,11 @@ int RadioClient::establish_connection(const Url &url) const
             format("Could not connect to '{}:{}'", url.address, url.port));
     }
 
+    if (fcntl(sockfd, F_SETFL, O_NONBLOCK) == -1) {
+        throw runtime_error("Could not set socket to nonblocking mode");
+    }
+
     return sockfd;
-}
-
-int RadioClient::find_radio_server(const Url &url) const
-{
-    Url cur_url = url;
-    optional<string> cookie;
-    bool found = false;
-    do {
-        int cur_fd = establish_connection(cur_url);
-        string request = get_http_request_string(
-            cur_url, radio_args.is_multiplexing, cookie);
-
-        if (cur_url.is_https)
-            auto [cur_url, found] = handle_https(std::move(request));
-        else
-            auto [cur_url, found] = handle_http(std::move(request));
-
-    } while (!found);
 }
 
 void RadioClient::start()
@@ -123,11 +117,11 @@ void RadioClient::start()
 
     ClientModes cur_mode = ClientModes::SendingData;
 
-    poll_fds[0].fd = STDIN_FILENO;
-    poll_fds[0].events = POLLIN;
+    poll_fds[INPUT_FD].fd = STDIN_FILENO;
+    poll_fds[INPUT_FD].events = POLLIN;
 
-    poll_fds[1].fd = establish_connection(cur_url);
-    poll_fds[1].events = POLLOUT;
+    poll_fds[SERVER_FD].fd = establish_connection(cur_url);
+    poll_fds[SERVER_FD].events = POLLOUT;
 
     std::array<char, BUFFER_SIZE> audio_buffer;
 
@@ -163,10 +157,10 @@ void RadioClient::start()
         }
 
         bool should_break{};
-        if (ClientModes::ReadingData)
-            should_break = handle_read(poll_fds);
-        else
-            should_break = handle_write(poll_fds);
+        if (ClientModes::ReadingData) {
+            should_break, new_url = handle_read(poll_fds);
+        } else
+            should_break, can_change = handle_write(poll_fds);
     }
 }
 

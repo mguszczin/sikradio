@@ -92,7 +92,6 @@ Url parse_url(string_view url)
     if (path.empty())
         path = "/";
 
-    // 4. Return the fully parsed URL
     return Url{.address = address,
                .port = port,
                .path = string{path},

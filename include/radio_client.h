@@ -23,6 +23,8 @@ class RadioClient {
 
     ProgramArguments radio_args;
 
+    int find_matching_address(const struct addrinfo *res) const noexcept;
+
     void set_up_addrinfo(struct addrinfo &hints) const;
 
     /**
@@ -33,8 +35,6 @@ class RadioClient {
      * to given url.
      */
     int establish_connection(const Url &url) const;
-
-    int find_radio_server(const Url &url) const;
 
   public:
     RadioClient(ProgramArguments args) : radio_args(std::move(args)) {};
