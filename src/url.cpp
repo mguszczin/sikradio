@@ -7,7 +7,9 @@
 #include <string_view>
 
 namespace {
+using std::errc;
 using std::format;
+using std::from_chars;
 using std::invalid_argument;
 using std::pair;
 using std::string;
@@ -45,28 +47,66 @@ size_t get_address_size(string_view url)
     return slash_pos;
 }
 
-/** For now ignores ipv6 values inside */
 pair<string, uint16_t> get_address_and_port(string_view host_port,
                                             bool is_https)
 {
     static constexpr uint16_t HTTP_PORT = 80;
     static constexpr uint16_t HTTPS_PORT = 443;
 
-    size_t colon_pos = host_port.find(':');
-
-    if (colon_pos == string_view::npos) {
-        return {string{host_port}, is_https ? HTTPS_PORT : HTTP_PORT};
+    if (host_port.empty()) {
+        throw invalid_argument(
+            "Cannot parse address and port from an empty string.");
     }
 
-    string host = string(host_port.substr(0, colon_pos));
-    string_view port_str = host_port.substr(colon_pos + 1);
+    string_view host_part;
+    string_view port_part;
 
-    try {
-        uint16_t port = static_cast<uint16_t>(stoul(string(port_str)));
-        return {host, port};
-    } catch (...) {
-        throw invalid_argument(format("Invalid port number: '{}'", port_str));
+    if (host_port.starts_with('[')) {
+        const size_t close_bracket_pos = host_port.find(']');
+        if (close_bracket_pos == string_view::npos) {
+            throw invalid_argument(format(
+                "Malformed IPv6 address: missing closing bracket in '{}'",
+                host_port));
+        }
+
+        host_part = host_port.substr(1, close_bracket_pos - 1);
+
+        const string_view remainder = host_port.substr(close_bracket_pos + 1);
+        if (!remainder.empty()) {
+            if (!remainder.starts_with(':')) {
+                throw invalid_argument(
+                    format("Malformed URL: expected ':' after ']', found '{}'",
+                           remainder.front()));
+            }
+            port_part = remainder.substr(1);
+        }
+    } else {
+        const size_t first_colon = host_port.find(':');
+        const size_t last_colon = host_port.rfind(':');
+
+        if (first_colon != string_view::npos && first_colon == last_colon) {
+            host_part = host_port.substr(0, first_colon);
+            port_part = host_port.substr(first_colon + 1);
+        } else {
+            host_part = host_port;
+        }
     }
+
+    uint16_t resolved_port = is_https ? HTTPS_PORT : HTTP_PORT;
+
+    if (!port_part.empty()) {
+        const auto *port_start = port_part.data();
+        const auto *port_end = port_start + port_part.size();
+
+        auto [ptr, ec] = from_chars(port_start, port_end, resolved_port);
+
+        if (ec != errc{} || ptr != port_end) {
+            throw invalid_argument(
+                format("Invalid port number: '{}'", port_part));
+        }
+    }
+
+    return {string(host_part), resolved_port};
 }
 
 } // namespace
@@ -92,7 +132,6 @@ Url parse_url(string_view url)
     if (path.empty())
         path = "/";
 
-    // 4. Return the fully parsed URL
     return Url{.address = address,
                .port = port,
                .path = string{path},

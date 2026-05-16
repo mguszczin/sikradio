@@ -42,7 +42,7 @@ class Reader {
 
     bool can_extract_header() noexcept;
 
-    std::optional<string> try_to_fetch_header();
+    std::optional<std::string> try_to_fetch_header();
 
     const std::string &get_buffer() const { return buffer; }
 };

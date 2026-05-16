@@ -14,7 +14,16 @@ struct Url {
     bool is_https;
 };
 
-[[nodiscard]] Url parse_url(std::string_view url);
+/**
+ * @brief Parses `std::string_view` to `Url` struct.
+ *
+ * Accepts only `http` and `https` protocols. If no port is specified inside
+ * `url` function assigns default port to the host (80 to http and 443 to
+ * https).
+ *
+ * @throws `std::invalid_argument` is url does not meet the RFC standards
+ */
+Url parse_url(std::string_view url);
 
 } // namespace url
 

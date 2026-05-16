@@ -104,11 +104,14 @@ string_view strip(string_view sv)
 }
 
 void process_header(ParsedHttpResponse &result, string_view key,
-                    string_view value)
+                    string_view value, bool is_content_mpeg_present)
 {
     static constexpr string_view HEADER_LOCATION = "location";
     static constexpr string_view HEADER_SET_COOKIE = "set-cookie";
     static constexpr string_view HEADER_ICY_METAINT = "icy-metaint";
+
+    static constexpr string_view HEADER_CONTENT_TYPE = "content-type";
+    static constexpr string_view HEADER_CONTENT_VALUE = "audio/mpeg";
 
     key = strip(key);
     value = strip(value);
@@ -132,6 +135,10 @@ void process_header(ParsedHttpResponse &result, string_view key,
         if (ec == errc()) {
             result.icy_metaint = metaint_val;
         }
+    } else if (key_lower == HEADER_CONTENT_TYPE) {
+        string value_lower = to_lower_string(value);
+        if (value == HEADER_CONTENT_VALUE)
+            is_content_mpeg_present = true;
     }
 }
 
@@ -142,6 +149,7 @@ void process_header(ParsedHttpResponse &result, string_view key,
     result.status = status;
 
     size_t current_pos = 0;
+    bool content_type_present = false;
 
     while (current_pos < headers.size()) {
         size_t next_crlf = headers.find(CRLF, current_pos);
@@ -158,11 +166,15 @@ void process_header(ParsedHttpResponse &result, string_view key,
             string_view key = header_line.substr(0, colon_pos);
             string_view value = header_line.substr(colon_pos + 1);
 
-            process_header(result, key, value);
+            process_header(result, key, value, content_type_present);
         }
 
         current_pos = next_crlf + CRLF.size();
     }
+
+    if (!content_type_present && status == ParsedStatus::HTTP_OK)
+        throw invalid_argument(
+            "Content type wasn't present inside the HTTP OK response");
 
     return result;
 }

@@ -67,7 +67,7 @@ ProgramArguments get_args(int argc, char *argv[])
     string url_str{};
     IpType type = IpType::Default;
     Verbosity verb = Verbosity::Warning;
-    bool is_multiplexing = true;
+    bool is_multiplexing = false;
     int timeout{5000};
 
     opterr = 0;

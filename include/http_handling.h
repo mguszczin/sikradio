@@ -17,7 +17,8 @@ using url::Url;
 inline constexpr string_view CRLF = "\r\n";
 inline constexpr string_view DOUBLE_CRLF = "\r\n\r\n";
 
-enum class ParsedStatus { HTTP_OK, HTTP_MOVED, FAILED_TO_PARSE };
+/* We only allow response in format of 3XX and 2XX */
+enum class ParsedStatus { HTTP_OK, HTTP_MOVED };
 
 struct ParsedHttpResponse {
     ParsedStatus status;
