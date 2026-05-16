@@ -28,18 +28,20 @@ using http::ParsedStatus;
 
 ParsedStatus check_response_line_parts(string_view protocol,
                                        string_view status_code,
-                                       string_view reason_phrase) noexcept
+                                       string_view reason_phrase)
 {
     if (protocol.empty() || status_code.empty() || reason_phrase.empty()) {
-        return ParsedStatus::FAILED_TO_PARSE;
+        throw invalid_argument("Response line parts cannot be empty.");
     }
 
     if (protocol != "HTTP/1.0" && protocol != "HTTP/1.1" && protocol != "ICY") {
-        return ParsedStatus::FAILED_TO_PARSE;
+        throw invalid_argument(
+            format("Unsupported or invalid protocol: '{}'", protocol));
     }
 
     if (status_code.size() != 3) {
-        return ParsedStatus::FAILED_TO_PARSE;
+        throw invalid_argument(
+            format("Status code must be exactly 3 digits: '{}'", status_code));
     }
 
     char first_digit = status_code[0];
@@ -54,24 +56,37 @@ ParsedStatus check_response_line_parts(string_view protocol,
         }
     }
 
-    return ParsedStatus::FAILED_TO_PARSE;
+    throw invalid_argument(
+        format("Unrecognized or unhandled status code: '{}'", status_code));
 }
 
-ParsedStatus parse_response_line(string_view response_line) noexcept
+ParsedStatus parse_response_line(string_view response_line)
 {
     if (response_line.size() < 2 ||
-        response_line.substr(response_line.size() - 2) != CRLF)
-        return ParsedStatus::FAILED_TO_PARSE;
+        response_line.substr(response_line.size() - 2) != CRLF) {
+        throw invalid_argument(format(
+            "Response line missing CRLF terminator:\n{}", response_line));
+    }
+
     string_view line = response_line.substr(0, response_line.size() - 2);
 
     size_t first_space = line.find(' ');
     if (first_space == string_view::npos) {
-        return ParsedStatus::FAILED_TO_PARSE;
+        throw invalid_argument(
+            format("Missing space after protocol in response line:\n{}",
+                   response_line));
     }
 
     size_t second_space = line.find(' ', first_space + 1);
-    if (second_space == string_view::npos || second_space == first_space + 1) {
-        return ParsedStatus::FAILED_TO_PARSE;
+    if (second_space == string_view::npos) {
+        throw invalid_argument(
+            format("Missing space after status code in response line:\n{}",
+                   response_line));
+    }
+
+    if (second_space == first_space + 1) {
+        throw invalid_argument(
+            "Empty status code section (double space detected).");
     }
 
     string_view protocol = line.substr(0, first_space);
@@ -183,23 +198,17 @@ void process_header(ParsedHttpResponse &result, string_view key,
 
 namespace http {
 
-[[nodiscard]] ParsedHttpResponse parse_http_response(string_view http_response)
+ParsedHttpResponse parse_http_response(string_view http_response)
 {
-    static const ParsedHttpResponse WRONG_PARSE = {
-        ParsedStatus::FAILED_TO_PARSE, nullopt, nullopt, nullopt};
 
     size_t end_of_headers = http_response.find(DOUBLE_CRLF);
-    if (end_of_headers == string_view::npos) {
-        return WRONG_PARSE;
-    }
+    if (end_of_headers == string_view::npos)
+        throw invalid_argument(format("No {} inside the http response:\n{}",
+                                      DOUBLE_CRLF, http_response));
 
     size_t first_crlf = http_response.find(CRLF);
     string_view first_line = http_response.substr(0, first_crlf + 2);
     ParsedStatus status = parse_response_line(first_line);
-
-    if (status == ParsedStatus::FAILED_TO_PARSE) {
-        return WRONG_PARSE;
-    }
 
     size_t headers_start = first_crlf + 2;
     size_t headers_len = end_of_headers + DOUBLE_CRLF.size() - headers_start;
@@ -209,8 +218,8 @@ namespace http {
     return parse_headers(headers, status);
 }
 
-[[nodiscard]] string get_http_request_string(const Url &url, bool is_multiplex,
-                                             optional<string> cookie)
+string get_http_request_string(const Url &url, bool is_multiplex,
+                               optional<string> cookie)
 {
     string cookie_header =
         cookie.has_value() ? format("Cookie: {}\r\n", cookie.value()) : "";

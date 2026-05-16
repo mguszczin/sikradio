@@ -27,10 +27,10 @@ struct ParsedHttpResponse {
     optional<size_t> icy_metaint;
 };
 
-[[nodiscard]] ParsedHttpResponse parse_http_response(string_view http_request);
+ParsedHttpResponse parse_http_response(string_view http_request);
 
-[[nodiscard]] string get_http_request_string(const Url &url, bool is_multiplex,
-                                             optional<string> cookie);
+string get_http_request_string(const Url &url, bool is_multiplex,
+                               optional<string> cookie);
 
 } // namespace http
 
