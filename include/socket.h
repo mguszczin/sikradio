@@ -1,0 +1,44 @@
+#ifndef SOCKET_H
+#define SOCKET_H
+
+#include <unistd.h>
+
+namespace http {
+
+class Socket {
+  private:
+    int fd;
+
+  public:
+    explicit Socket(int fd = -1) : fd(fd) {}
+
+    Socket(const Socket &) = delete;
+    Socket &operator=(const Socket &) = delete;
+
+    Socket(Socket &&other) noexcept : fd(other.fd) { other.fd = -1; }
+
+    Socket &operator=(Socket &&other) noexcept
+    {
+        if (this != &other) {
+            if (fd >= 0)
+                close(fd);
+            fd = other.fd;
+            other.fd = -1;
+        }
+        return *this;
+    }
+
+    ~Socket()
+    {
+        if (fd >= 0) {
+            close(fd);
+        }
+    }
+
+    operator int() const { return fd; }
+    bool is_valid() const { return fd >= 0; }
+};
+
+} // namespace http
+
+#endif

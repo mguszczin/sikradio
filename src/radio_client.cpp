@@ -88,6 +88,8 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
         new_url, radio_args.is_multiplexing, response.cookie);
 
     writer.change_buffer(new_request);
+    establish_connection(new_url);
+    poll_fd.fd = server_socket;
     return;
 }
 
@@ -112,7 +114,7 @@ bool RadioClient::handle_user_input(const pollfd &poll_fd)
 
 void RadioClient::handle_timeout()
 {
-    if (mode == ClientModes::ReadingData)
+    if (mode == ClientModes::ReadingHeaders)
         reader.restart();
 
     mode = ClientModes::SendingData;
@@ -128,7 +130,7 @@ bool RadioClient::handle_server_comunication(pollfd &poll_fd)
         else if (response == http::SocketStatus::Continuing)
             return false;
 
-        mode = ClientModes::ReadingData;
+        mode = ClientModes::ReadingHeaders;
         return false;
     } else {
         auto response = reader.read_from_socket(poll_fd);
@@ -167,7 +169,7 @@ void RadioClient::set_up_addrinfo(struct addrinfo &hints) const
     }
 }
 
-int RadioClient::establish_connection(const Url &url) const
+void RadioClient::establish_connection(const Url &url)
 {
     struct addrinfo hints, *res;
 
@@ -201,8 +203,7 @@ int RadioClient::establish_connection(const Url &url) const
         throw runtime_error(
             format("Could not connect to '{}:{}'", url.address, url.port));
     }
-
-    return sockfd;
+    server_socket = Socket{sockfd};
 }
 
 void RadioClient::start()
@@ -217,7 +218,7 @@ void RadioClient::start()
     poll_fds[INPUT_FD].fd = STDIN_FILENO;
     poll_fds[INPUT_FD].events = POLLIN;
 
-    poll_fds[SERVER_FD].fd = establish_connection(cur_url);
+    poll_fds[SERVER_FD].fd = server_socket;
     poll_fds[SERVER_FD].events = POLLOUT;
 
     while (1) {

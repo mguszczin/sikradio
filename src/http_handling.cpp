@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "socket.h"
 #include "url.h"
 
 namespace {
