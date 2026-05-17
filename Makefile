@@ -6,6 +6,7 @@ INCLUDE_DIR = include
 
 CXX_FLAGS = -std=c++23 -O2 -Wall -Wextra
 CPPFLAGS = -I$(INCLUDE_DIR) -MMD -MP
+LD_FLAGS = -lssl -lcrypto
 
 TARGET = sikradio
 
@@ -18,7 +19,7 @@ DEPS = $(SRC_OBJ:.o=.d)
 all: $(TARGET)
 
 $(TARGET): $(SRC_OBJ)
-	$(CXX) $(CXX_FLAGS) -o $@ $^
+	$(CXX) $(CXX_FLAGS) $(LD_FLAGS) -o $@ $^
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)

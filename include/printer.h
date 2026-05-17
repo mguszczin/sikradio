@@ -24,6 +24,8 @@ class Printer {
     {
     }
 
+    void set_metaint(int c) noexcept { meta_int = c; }
+
     /**
      * Prints the buffer to stdout (audio) and stderr (metadata),
      * taking metaint into account.
