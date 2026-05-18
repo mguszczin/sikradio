@@ -188,7 +188,7 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
 
 bool RadioClient::handle_sending_request(pollfd &poll_fd)
 {
-    auto response = writer.write_to_socket(poll_fd);
+    auto response = writer.write_to_socket(poll_fd, ssl);
     if (response == SocketStatus::Finished)
         mode = ClientModes::ReadingHeaders;
 
@@ -197,7 +197,7 @@ bool RadioClient::handle_sending_request(pollfd &poll_fd)
 
 bool RadioClient::handle_reading_headers(pollfd &poll_fd)
 {
-    auto response = reader.read_from_socket(poll_fd);
+    auto response = reader.read_from_socket(poll_fd, ssl);
     optional<string> pot_headers = reader.try_to_fetch_header();
 
     if (pot_headers)
@@ -208,7 +208,7 @@ bool RadioClient::handle_reading_headers(pollfd &poll_fd)
 
 bool RadioClient::handle_reading_body(pollfd &poll_fd)
 {
-    auto response = reader.read_from_socket(poll_fd);
+    auto response = reader.read_from_socket(poll_fd, ssl);
     printer.print(reader.restart());
 
     return (response == SocketStatus::ConnectionClosed);
@@ -241,6 +241,21 @@ bool RadioClient::handle_tls_handshake(struct pollfd &poll_fd)
 
 bool RadioClient::handle_server_comunication(pollfd &poll_fd)
 {
+    if (poll_fd.revents & (POLLHUP))
+        return true;
+
+    if (poll_fd.revents & (POLLERR)) {
+        int error = 0;
+        socklen_t errlen = sizeof(error);
+
+        if (getsockopt(poll_fd.fd, SOL_SOCKET, SO_ERROR, &error, &errlen) == 0)
+            throw runtime_error(format("POLLERR on fd {}: {} (error code : {})",
+                                       poll_fd.fd, strerror(error), error));
+        else
+            throw runtime_error(format(
+                "POLLERR on fd {}: Failed to extract error via getsockopt",
+                poll_fd.fd));
+    }
     switch (mode) {
     case ClientModes::SendingData:
         return handle_sending_request(poll_fd);

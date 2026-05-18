@@ -3,6 +3,8 @@
 #include <array>
 #include <cerrno>
 #include <optional>
+#include <stdexcept>
+#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -11,33 +13,75 @@
 
 #include "http_handling.h"
 
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+
 namespace {
 using std::array;
 using std::generic_category;
 using std::nullopt;
 using std::optional;
+using std::runtime_error;
 using std::string;
 using std::string_view;
 using std::system_error;
+using std::to_string;
 } // namespace
 
 namespace http {
+
+SslOperationResult evaluate_ssl_error(SSL *ssl, int return_code,
+                                      bool is_reading, int fd)
+{
+    if (return_code > 0)
+        return SslOperationResult::Success;
+
+    int err = SSL_get_error(ssl, return_code);
+
+    switch (err) {
+    case SSL_ERROR_WANT_READ:
+        return SslOperationResult::NeedsRead;
+
+    case SSL_ERROR_WANT_WRITE:
+        return SslOperationResult::NeedsWrite;
+
+    case SSL_ERROR_ZERO_RETURN:
+        return SslOperationResult::Closed;
+
+    case SSL_ERROR_SYSCALL:
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+            return is_reading ? SslOperationResult::NeedsRead
+                              : SslOperationResult::NeedsWrite;
+        }
+
+        if (errno != 0) {
+            throw system_error(errno, generic_category(),
+                               "SSL Syscall error on fd " + to_string(fd));
+        } else if (return_code == 0) {
+            throw runtime_error("SSL Syscall error on fd " + to_string(fd) +
+                                ": unexpected EOF");
+        }
+        throw runtime_error("Unknown SSL Syscall error on fd " + to_string(fd));
+
+    case SSL_ERROR_SSL: {
+        unsigned long err_queue_code = ERR_get_error();
+        char err_buf[256];
+        ERR_error_string_n(err_queue_code, err_buf, sizeof(err_buf));
+        throw runtime_error(string("Fatal OpenSSL protocol error: ") + err_buf);
+    }
+
+    default:
+        throw runtime_error("Unknown SSL error code: " + to_string(err));
+    }
+}
 
 bool Writer::is_finished() const noexcept
 {
     return bytes_sent >= buffer.size();
 }
 
-SocketStatus Writer::write_to_socket(const struct pollfd &pfd)
+SocketStatus Writer::write_using_http(const struct pollfd &pfd)
 {
-    if (pfd.revents & (POLLERR | POLLHUP)) {
-        return SocketStatus::ConnectionClosed;
-    }
-
-    if (!(pfd.revents & POLLOUT)) {
-        return SocketStatus::Continuing;
-    }
-
     if (is_finished())
         return SocketStatus::Finished;
 
@@ -57,7 +101,7 @@ SocketStatus Writer::write_to_socket(const struct pollfd &pfd)
     }
 
     if (sent < 0) {
-        if (errno == EWOULDBLOCK || errno == EAGAIN) {
+        if (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
             return SocketStatus::Continuing;
         }
 
@@ -65,10 +109,56 @@ SocketStatus Writer::write_to_socket(const struct pollfd &pfd)
             return SocketStatus::ConnectionClosed;
         }
 
-        return SocketStatus::Error;
+        throw system_error(errno, generic_category(),
+                           "Failed to write to socket");
     }
 
-    return SocketStatus::Error;
+    throw runtime_error("send() returned 0 unexpectedly");
+}
+
+SocketStatus Writer::write_using_https(struct pollfd &pfd, SSL *ssl)
+{
+    if (is_finished())
+        return SocketStatus::Finished;
+
+    const char *data_ptr = buffer.data() + bytes_sent;
+    size_t data_len = buffer.size() - bytes_sent;
+
+    int sent = SSL_write(ssl, data_ptr, static_cast<int>(data_len));
+
+    SslOperationResult res = evaluate_ssl_error(ssl, sent, false, pfd.fd);
+
+    switch (res) {
+    case SslOperationResult::Success:
+        bytes_sent += sent;
+
+        if (is_finished()) {
+            return SocketStatus::Finished;
+        }
+        return SocketStatus::Continuing;
+
+    case SslOperationResult::NeedsRead:
+        pfd.events = POLLIN;
+        return SocketStatus::Continuing;
+
+    case SslOperationResult::NeedsWrite:
+        pfd.events = POLLOUT;
+        return SocketStatus::Continuing;
+
+    case SslOperationResult::Closed:
+        return SocketStatus::ConnectionClosed;
+
+    default:
+        throw runtime_error("Unexpected SSL operation result during write");
+    }
+}
+
+SocketStatus Writer::write_to_socket(struct pollfd &pfd, SSL *ssl)
+{
+    if (ssl)
+        return write_using_https(pfd, ssl);
+    else
+        return write_using_http(pfd);
 }
 
 void Writer::restart() noexcept { bytes_sent = 0; }
@@ -78,16 +168,8 @@ void Writer::change_buffer(std::string to_write)
     buffer = std::move(to_write);
 }
 
-SocketStatus Reader::read_from_socket(const pollfd &pfd)
+SocketStatus Reader::read_using_http(const struct pollfd &pfd)
 {
-    if (pfd.revents & (POLLERR | POLLHUP)) {
-        return SocketStatus::ConnectionClosed;
-    }
-
-    if (!(pfd.revents & POLLIN)) {
-        return SocketStatus::Continuing;
-    }
-
     array<char, PAGE_SIZE> reading_buffer;
 
     ssize_t status =
@@ -99,13 +181,50 @@ SocketStatus Reader::read_from_socket(const pollfd &pfd)
     } else if (status == 0) {
         return SocketStatus::ConnectionClosed;
     } else {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
             return SocketStatus::Continuing;
         }
 
         throw system_error(errno, generic_category(),
                            "Failed to read from socket");
     }
+}
+
+SocketStatus Reader::read_using_https(struct pollfd &pfd, SSL *ssl)
+{
+    array<char, PAGE_SIZE> reading_buffer;
+
+    int status = SSL_read(ssl, reading_buffer.data(), reading_buffer.size());
+
+    SslOperationResult res = evaluate_ssl_error(ssl, status, true, pfd.fd);
+
+    switch (res) {
+    case SslOperationResult::Success:
+        buffer.append(reading_buffer.begin(), reading_buffer.begin() + status);
+        return SocketStatus::Continuing;
+
+    case SslOperationResult::NeedsRead:
+        pfd.events = POLLIN;
+        return SocketStatus::Continuing;
+
+    case SslOperationResult::NeedsWrite:
+        pfd.events = POLLOUT;
+        return SocketStatus::Continuing;
+
+    case SslOperationResult::Closed:
+        return SocketStatus::ConnectionClosed;
+
+    default:
+        throw runtime_error("Unexpected SSL operation result during read");
+    }
+}
+
+SocketStatus Reader::read_from_socket(struct pollfd &pfd, SSL *ssl)
+{
+    if (ssl)
+        return read_using_https(pfd, ssl);
+    else
+        return read_using_http(pfd);
 }
 
 optional<string> Reader::try_to_fetch_header()
