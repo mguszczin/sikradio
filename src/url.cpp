@@ -1,10 +1,13 @@
 #include "url.h"
 
+#include <charconv>
 #include <cstdint>
 #include <format>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+
+#include "verbosity.h"
 
 namespace {
 using std::errc;
@@ -104,6 +107,8 @@ pair<string, uint16_t> get_address_and_port(string_view host_port,
             throw invalid_argument(
                 format("Invalid port number: '{}'", port_part));
         }
+
+        log::debug("Custom port detected: {}", resolved_port);
     }
 
     return {string(host_part), resolved_port};
@@ -113,11 +118,9 @@ pair<string, uint16_t> get_address_and_port(string_view host_port,
 
 namespace url {
 
-Url parse_url(string_view url)
+[[nodiscard]] Url parse_url(string_view url)
 {
-    static constexpr uint16_t HTTP_PORT = 80;
-    static constexpr uint16_t HTTPS_PORT = 443;
-
+    log::debug("Parsing url: {}", url);
     auto [prefix_size, is_https] = check_for_http_prefix(url);
 
     string_view url_without_http_pref = url.substr(prefix_size);
@@ -131,6 +134,10 @@ Url parse_url(string_view url)
     string_view path = url_without_http_pref.substr(slash_pos);
     if (path.empty())
         path = "/";
+
+    log::debug(
+        "Parsed result -> Address: '{}', Port: {}, Path: '{}', HTTPS: {}",
+        address, port, path, is_https);
 
     return Url{.address = address,
                .port = port,

@@ -22,16 +22,19 @@
 #include "buffer_handling.h"
 #include "http_handling.h"
 #include "url.h"
+#include "verbosity.h"
 
 namespace {
 
+using log::Verbosity;
+
 using program_arguments::IpType;
-using program_arguments::Verbosity;
 
 using http::get_http_request_string;
 using http::parse_http_response;
 using http::ParsedHttpResponse;
 using http::ParsedStatus;
+using http::Socket;
 using http::SocketStatus;
 
 using std::array;

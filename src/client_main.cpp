@@ -20,6 +20,8 @@ using log::set_verbosity;
 
 using client::RadioClient;
 
+using url::parse_url;
+
 int main(int argc, char *argv[])
 {
     try {

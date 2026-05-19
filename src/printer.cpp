@@ -52,12 +52,8 @@ void Printer::process_metadata(const string &buffer, size_t &i)
     i += bytes_to_read;
 
     if (meta_bytes_to_read == 0) {
-        while (!current_metadata.empty() && current_metadata.back() == '\0') {
-            current_metadata.pop_back();
-        }
-
         if (!current_metadata.empty()) {
-            cerr << current_metadata << endl;
+            cerr.write(current_metadata.data(), current_metadata.size());
         }
 
         audio_bytes_read = 0;

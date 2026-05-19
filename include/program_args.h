@@ -15,7 +15,7 @@ struct ProgramArguments {
     std::string url_address;
 
     IpType ip = IpType::Default;
-    log::Verbosity verb = log::Verbosity::Warning;
+    log::Verbosity verb = log::Verbosity::SystemWarning;
 
     bool is_multiplexing = false;
 
@@ -23,11 +23,10 @@ struct ProgramArguments {
 };
 
 /**
- * Function reads arguments from `argv`. Assumes the arguments are in the same
- * format as program arguments.
+ * @brief Parses command-line arguments.
  *
- * @throws `std::invalid_argument` if no url (-u flag) is specified or if flags
- * are not used correctly.
+ * @throws `std::invalid_argument` If the URL (-u) is missing or arguments are
+ * invalid.
  */
 [[nodiscard]] ProgramArguments get_args(int argc, char *const argv[]);
 

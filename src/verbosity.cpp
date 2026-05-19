@@ -1,10 +1,13 @@
 #include "verbosity.h"
 
+#include <format>
 #include <stdexcept>
 #include <string>
 
 namespace {
+using std::format;
 using std::invalid_argument;
+using std::logic_error;
 using std::stoi;
 using std::string;
 } // namespace

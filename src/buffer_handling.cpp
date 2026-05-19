@@ -166,6 +166,7 @@ void Writer::restart() noexcept { bytes_sent = 0; }
 void Writer::change_buffer(std::string to_write)
 {
     buffer = std::move(to_write);
+    bytes_sent = 0;
 }
 
 SocketStatus Reader::read_using_http(const struct pollfd &pfd)

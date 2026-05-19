@@ -23,7 +23,7 @@ struct Url {
  *
  * @throws `std::invalid_argument` is url does not meet the RFC standards
  */
-Url parse_url(std::string_view url);
+[[nodiscard]] Url parse_url(std::string_view url);
 
 } // namespace url
 

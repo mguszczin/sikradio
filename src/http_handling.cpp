@@ -9,6 +9,7 @@
 
 #include "socket.h"
 #include "url.h"
+#include "verbosity.h"
 
 namespace {
 
@@ -17,6 +18,7 @@ using std::format;
 using std::from_chars;
 using std::invalid_argument;
 using std::nullopt;
+using std::optional;
 using std::stoull;
 using std::string;
 using std::string_view;
@@ -26,6 +28,8 @@ using http::CRLF;
 using http::DOUBLE_CRLF;
 using http::ParsedHttpResponse;
 using http::ParsedStatus;
+
+using url::Url;
 
 ParsedStatus check_response_line_parts(string_view protocol,
                                        string_view status_code,
@@ -201,7 +205,6 @@ namespace http {
 
 ParsedHttpResponse parse_http_response(string_view http_response)
 {
-
     size_t end_of_headers = http_response.find(DOUBLE_CRLF);
     if (end_of_headers == string_view::npos)
         throw invalid_argument(format("No {} inside the http response:\n{}",

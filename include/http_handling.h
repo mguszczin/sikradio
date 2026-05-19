@@ -24,8 +24,13 @@ struct ParsedHttpResponse {
 
 ParsedHttpResponse parse_http_response(std::string_view http_request);
 
-string get_http_request_string(const url::Url &url, bool is_multiplex,
-                               std::optional<std::string> cookie);
+/**
+ * @brief Returns HTTP request requesting path and host specified in url.
+ *
+ *
+ */
+std::string get_http_request_string(const url::Url &url, bool is_multiplex,
+                                    std::optional<std::string> cookie);
 
 } // namespace http
 
