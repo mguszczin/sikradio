@@ -233,10 +233,14 @@ optional<string> Reader::try_to_fetch_header()
     if (!can_extract_header())
         return nullopt;
 
-    static constexpr std::string_view delimiter = "\r\n\r\n";
-
     size_t pos = buffer.find(DOUBLE_CRLF);
-    size_t split_point = pos + delimiter.length();
+
+    if (pos == string::npos) {
+        throw runtime_error(
+            "HTTP headers exceeded maximum allowed size without termination");
+    }
+
+    size_t split_point = pos + DOUBLE_CRLF.length();
 
     string header = buffer.substr(0, split_point);
 
@@ -251,16 +255,22 @@ string Reader::restart() noexcept
     last_time_asked = 0;
 
     string tmp = std::move(buffer);
-    buffer = "";
+    buffer.clear();
     return tmp;
 }
 
 bool Reader::can_extract_header() noexcept
 {
-    size_t pos = buffer.find(DOUBLE_CRLF, last_time_asked);
+    size_t search_start = (last_time_asked >= 3) ? last_time_asked - 3 : 0;
+
+    size_t pos = buffer.find(DOUBLE_CRLF, search_start);
     last_time_asked = buffer.size();
-    if (pos != string_view::npos || buffer.size() >= 2 * PAGE_SIZE)
+
+    if (pos != string_view::npos) {
         is_header_present = true;
+    } else if (buffer.size() >= 2 * PAGE_SIZE) {
+        is_header_present = true;
+    }
 
     return is_header_present;
 }

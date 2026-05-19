@@ -60,11 +60,17 @@ void Printer::process_metadata(const string &buffer, size_t &i)
     }
 }
 
-bool Printer::print(const string &buffer)
+void Printer::print(const string &buffer)
 {
     if (meta_int <= 0) {
         cout.write(buffer.data(), buffer.size());
-        return !cout.fail();
+
+        if (!cout) {
+            throw std::runtime_error(
+                "Fatal error: Failed to write audio data to standard output "
+                "(broken pipe or stream error).");
+        }
+        return;
     }
 
     size_t i = 0;
@@ -78,10 +84,13 @@ bool Printer::print(const string &buffer)
         } else if (meta_bytes_to_read > 0) {
             process_metadata(buffer, i);
         }
-    }
 
-    cout.flush();
-    return cout.good();
+        if (!cout) {
+            throw std::runtime_error(
+                "Fatal error: Failed to write audio data to standard output "
+                "during multiplexed stream parsing.");
+        }
+    }
 }
 
 } // namespace client

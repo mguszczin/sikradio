@@ -71,11 +71,11 @@ class RadioClient {
 
     bool handle_server_comunication(struct pollfd &poll);
 
-    bool handle_user_input(const struct pollfd &poll);
+    bool handle_user_input(struct pollfd &poll);
 
     bool handle_tls_handshake(struct pollfd &poll_fd);
 
-    void handle_timeout();
+    void handle_timeout(struct pollfd &poll_fd);
 
   public:
     RadioClient(bool is_multiplexing, int timeout, program_arguments::IpType ip,

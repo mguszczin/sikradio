@@ -30,10 +30,8 @@ class Printer {
     /**
      * Prints the buffer to stdout (audio) and stderr (metadata),
      * taking metaint into account.
-     *
-     * @returns true if the connection is not broken
      */
-    bool print(const std::string &buffer);
+    void print(const std::string &buffer);
 
     void reset() noexcept
     {
