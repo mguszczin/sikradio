@@ -46,7 +46,7 @@ class RadioClient {
     ClientModes mode;
     url::Url cur_url;
 
-    Socket server_socket;
+    http::Socket server_socket;
 
     int connect_to_socket(const struct addrinfo *res) const noexcept;
 

@@ -108,7 +108,7 @@ pair<string, uint16_t> get_address_and_port(string_view host_port,
                 format("Invalid port number: '{}'", port_part));
         }
 
-        log::debug("Custom port detected: {}", resolved_port);
+        logs::debug("Custom port detected: {}", resolved_port);
     }
 
     return {string(host_part), resolved_port};
@@ -120,7 +120,7 @@ namespace url {
 
 [[nodiscard]] Url parse_url(string_view url)
 {
-    log::debug("Parsing url: {}", url);
+    logs::debug("Parsing url: {}", url);
     auto [prefix_size, is_https] = check_for_http_prefix(url);
 
     string_view url_without_http_pref = url.substr(prefix_size);
@@ -135,7 +135,7 @@ namespace url {
     if (path.empty())
         path = "/";
 
-    log::debug(
+    logs::debug(
         "Parsed result -> Address: '{}', Port: {}, Path: '{}', HTTPS: {}",
         address, port, path, is_https);
 

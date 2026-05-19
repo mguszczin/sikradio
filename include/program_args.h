@@ -15,7 +15,7 @@ struct ProgramArguments {
     std::string url_address;
 
     IpType ip = IpType::Default;
-    log::Verbosity verb = log::Verbosity::SystemWarning;
+    logs::Verbosity verb = logs::Verbosity::SystemWarning;
 
     bool is_multiplexing = false;
 

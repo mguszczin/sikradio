@@ -7,7 +7,7 @@
 #include <string>
 #include <utility>
 
-namespace log {
+namespace logs {
 
 enum class Verbosity {
     Quiet,         // V0
@@ -66,6 +66,6 @@ inline void debug(std::format_string<Args...> fmt, Args &&...args)
  */
 Verbosity parse_verbosity(const std::string &arg);
 
-} // namespace log
+} // namespace logs
 
 #endif

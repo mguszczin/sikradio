@@ -15,8 +15,8 @@ using std::logic_error;
 using std::stoi;
 using std::string;
 
-using log::parse_verbosity;
-using log::Verbosity;
+using logs::parse_verbosity;
+using logs::Verbosity;
 
 using program_arguments::ProgramArguments;
 

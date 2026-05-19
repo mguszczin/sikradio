@@ -197,13 +197,13 @@ void process_header(ParsedHttpResponse &result, string_view key,
         throw invalid_argument(
             "Content type wasn't present inside the HTTP OK response");
 
-    log::debug("Parsed Http Response: status: {}, location: {}, cookie: {}, "
-               "icy_metaint: {}",
-               static_cast<int>(result.status),
-               result.location.value_or("none"), result.cookie.value_or("none"),
-               result.icy_metaint.has_value()
-                   ? std::to_string(*result.icy_metaint)
-                   : "none");
+    logs::debug(
+        "Parsed Http Response: status: {}, location: {}, cookie: {}, "
+        "icy_metaint: {}",
+        static_cast<int>(result.status), result.location.value_or("none"),
+        result.cookie.value_or("none"),
+        result.icy_metaint.has_value() ? std::to_string(*result.icy_metaint)
+                                       : "none");
     return result;
 }
 
@@ -213,7 +213,7 @@ namespace http {
 
 ParsedHttpResponse parse_http_response(string_view http_response)
 {
-    log::debug("http response to parse {}", http_response);
+    logs::debug("http response to parse {}", http_response);
 
     size_t end_of_headers = http_response.find(DOUBLE_CRLF);
     if (end_of_headers == string_view::npos)

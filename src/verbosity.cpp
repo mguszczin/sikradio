@@ -12,7 +12,7 @@ using std::stoi;
 using std::string;
 } // namespace
 
-namespace log {
+namespace logs {
 
 Verbosity parse_verbosity(const string &arg)
 {
@@ -34,4 +34,4 @@ Verbosity parse_verbosity(const string &arg)
     return static_cast<Verbosity>(v_val);
 }
 
-} // namespace log
+} // namespace logs

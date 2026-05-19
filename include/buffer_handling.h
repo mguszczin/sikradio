@@ -2,6 +2,7 @@
 #define WRITER_H
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>

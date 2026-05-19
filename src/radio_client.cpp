@@ -29,7 +29,7 @@
 
 namespace {
 
-using log::Verbosity;
+using logs::Verbosity;
 
 using program_arguments::IpType;
 
@@ -140,8 +140,8 @@ int RadioClient::connect_to_socket(const struct addrinfo *res) const noexcept
 
 void RadioClient::establish_connection(const Url &url, struct pollfd &poll_fd)
 {
-    log::server_info("{}\nresolving name {}", get_current_timestamp(),
-                     url.address);
+    logs::server_info("{}\nresolving name {}", get_current_timestamp(),
+                      url.address);
 
     if (ssl != nullptr) {
         SSL_free(ssl);
@@ -168,7 +168,7 @@ void RadioClient::establish_connection(const Url &url, struct pollfd &poll_fd)
             format("Could not connect to '{}:{}'", url.address, url.port));
     }
 
-    log::server_info("connecting to server {}", get_peer_address(sockfd));
+    logs::server_info("connecting to server {}", get_peer_address(sockfd));
 
     if (fcntl(sockfd, F_SETFL, O_NONBLOCK) == -1) {
         throw system_error(errno, generic_category(),
@@ -233,7 +233,7 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     writer.change_buffer(new_request);
     establish_connection(cur_url, poll_fd);
 
-    log::server_info("{}", new_request.substr(0, new_request.size() - 2));
+    logs::server_info("{}", new_request.substr(0, new_request.size() - 2));
 
     return;
 }
@@ -255,8 +255,8 @@ bool RadioClient::handle_reading_headers(pollfd &poll_fd)
     optional<string> pot_headers = reader.try_to_fetch_header();
 
     if (pot_headers) {
-        log::server_info("{}", pot_headers.value().substr(
-                                   0, pot_headers.value().size() - 2));
+        logs::server_info("{}", pot_headers.value().substr(
+                                    0, pot_headers.value().size() - 2));
         handle_new_headers(poll_fd, pot_headers.value());
     }
 
@@ -339,8 +339,8 @@ bool RadioClient::handle_user_input(pollfd &poll_fd)
     }
 
     if (poll_fd.revents & POLLHUP) {
-        log::debug("Standard input disconnected (POLLHUP). Continuing "
-                   "background playback.");
+        logs::debug("Standard input disconnected (POLLHUP). Continuing "
+                    "background playback.");
         poll_fd.fd = -1;
         return false;
     }
@@ -354,7 +354,7 @@ bool RadioClient::handle_user_input(pollfd &poll_fd)
             }
         } else {
             if (cin.eof()) {
-                log::debug("Standard input reached EOF. Continuing playback.");
+                logs::debug("Standard input reached EOF. Continuing playback.");
                 poll_fd.fd = -1;
                 return false;
             } else {
@@ -368,7 +368,7 @@ bool RadioClient::handle_user_input(pollfd &poll_fd)
 
 void RadioClient::handle_timeout(struct pollfd &poll_fd)
 {
-    log::server_info("data receiving timeout");
+    logs::server_info("data receiving timeout");
 
     reader.restart();
     writer.restart();
@@ -377,7 +377,7 @@ void RadioClient::handle_timeout(struct pollfd &poll_fd)
 
     string request = get_http_request_string(cur_url, is_multiplexing, nullopt);
     writer.change_buffer(request);
-    log::server_info("{}", request.substr(0, request.size() - 2));
+    logs::server_info("{}", request.substr(0, request.size() - 2));
 }
 
 void RadioClient::start()
@@ -392,7 +392,7 @@ void RadioClient::start()
     poll_fds[INPUT_FD].events = POLLIN;
 
     establish_connection(cur_url, poll_fds[SERVER_FD]);
-    log::server_info("{}", request.substr(0, request.size() - 2));
+    logs::server_info("{}", request.substr(0, request.size() - 2));
 
     while (1) {
         int status = poll(poll_fds.data(), poll_fds.size(), timeout);
