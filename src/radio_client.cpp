@@ -61,7 +61,7 @@ using url::Url;
 
 namespace client {
 
-void RadioClient::set_up_addrinfo(struct addrinfo &hints) const
+void RadioClient::set_up_addrinfo(struct addrinfo &hints) const noexcept
 {
     memset(&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;
@@ -185,15 +185,19 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
         get_http_request_string(new_url, is_multiplexing, response.cookie);
 
     writer.change_buffer(new_request);
-    establish_connection(new_url, poll_fd);
+    establish_connection(new_url,
+                         poll_fd); // not sure if we shouldn't do timout here?
+                                   // don't know about accept
     return;
 }
 
 bool RadioClient::handle_sending_request(pollfd &poll_fd)
 {
     auto response = writer.write_to_socket(poll_fd, ssl);
-    if (response == SocketStatus::Finished)
+    if (response == SocketStatus::Finished) {
         mode = ClientModes::ReadingHeaders;
+        poll_fd.events = POLLIN;
+    }
 
     return (response == SocketStatus::ConnectionClosed);
 }
@@ -301,7 +305,7 @@ void RadioClient::handle_timeout()
         reader.restart();
 
     mode = ClientModes::SendingData;
-    reader.restart();
+    writer.restart();
 }
 
 void RadioClient::start()

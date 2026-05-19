@@ -2,6 +2,7 @@
 #define RADIO_CLIENT_H
 
 #include <cstdint>
+#include <string_view>
 
 #include <netdb.h>
 #include <poll.h>
@@ -22,7 +23,7 @@ namespace client {
 class RadioClient {
   private:
     static constexpr size_t LISTENING_POINTS = 2;
-    static constexpr std::string QUIT_MESSAGE = "quit";
+    static constexpr std::string_view QUIT_MESSAGE = "quit";
 
     enum class ClientModes {
         SendingData,
@@ -47,6 +48,19 @@ class RadioClient {
 
     Socket server_socket;
 
+    int connect_to_socket(const struct addrinfo *res) const noexcept;
+
+    void set_up_addrinfo(struct addrinfo &hints) const noexcept;
+
+    /**
+     * Establishes connection with server under `cur_url`
+     * and returns socket descriptor to that url.
+     *
+     * @throws `std::runtime_error` if function can't connect
+     * to given url.
+     */
+    void establish_connection(const url::Url &url, struct pollfd &poll_fd);
+
     void handle_new_headers(struct pollfd &poll, const std::string &headers);
 
     bool handle_sending_request(struct pollfd &poll);
@@ -63,28 +77,18 @@ class RadioClient {
 
     void handle_timeout();
 
-    int connect_to_socket(const struct addrinfo *res) const noexcept;
-
-    void set_up_addrinfo(struct addrinfo &hints) const;
-
-    /**
-     * Establishes connection with server under `cur_url`
-     * and returns socket descriptor to that url.
-     *
-     * @throws `std::runtime_error` if function can't connect
-     * to given url.
-     */
-    void establish_connection(const url::Url &url, struct pollfd &poll_fd);
-
   public:
     RadioClient(bool is_multiplexing, int timeout, program_arguments::IpType ip,
                 url::Url cur_url)
         : is_multiplexing(is_multiplexing), timeout(timeout), ip(ip), reader(),
           writer(), printer(), cur_url(std::move(cur_url))
     {
-        SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
-        SSL_CTX_set_default_verify_paths(ctx);
+        ssl_ctx = SSL_CTX_new(TLS_client_method());
+        SSL_CTX_set_default_verify_paths(ssl_ctx);
     };
+
+    RadioClient(const RadioClient &) = delete;
+    RadioClient &operator=(const RadioClient &) = delete;
 
     ~RadioClient()
     {

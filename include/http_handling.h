@@ -22,12 +22,17 @@ struct ParsedHttpResponse {
     std::optional<size_t> icy_metaint;
 };
 
+/**
+ * @brief Parses a complete raw HTTP response text into a structured response
+ * object.
+ *
+ * @throws `std::invalid_argument` If the headers are malformed, missing
+ * required fields, or protocols are unsupported.
+ */
 ParsedHttpResponse parse_http_response(std::string_view http_request);
 
 /**
- * @brief Returns HTTP request requesting path and host specified in url.
- *
- *
+ * @brief Generates a raw HTTP GET request formatted string.
  */
 std::string get_http_request_string(const url::Url &url, bool is_multiplex,
                                     std::optional<std::string> cookie);

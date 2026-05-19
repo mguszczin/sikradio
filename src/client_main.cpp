@@ -28,6 +28,12 @@ int main(int argc, char *argv[])
         ProgramArguments args = get_args(argc, argv);
         set_verbosity(args.verb);
 
+        log::debug("Program Arguments : URL: '{}', IP Type: {}, Verbosity: "
+                   "{}, Multiplexing: {}, Timeout: {}ms",
+                   args.url_address.empty() ? "none" : args.url_address,
+                   static_cast<int>(args.ip), static_cast<int>(args.verb),
+                   args.is_multiplexing ? "true" : "false", args.timeout);
+
         RadioClient client{args.is_multiplexing, args.timeout, args.ip,
                            parse_url(args.url_address)};
         client.start();

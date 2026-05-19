@@ -3,6 +3,7 @@
 
 #include <format>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -46,8 +47,7 @@ template <typename... Args>
 inline void server_info(std::format_string<Args...> fmt, Args &&...args)
 {
     if (current_verbosity >= Verbosity::ServerInfo)
-        std::cerr << "[INFO]  " << std::format(fmt, std::forward<Args>(args)...)
-                  << std::endl;
+        std::cerr << std::format(fmt, std::forward<Args>(args)...) << std::endl;
 }
 
 template <typename... Args>
