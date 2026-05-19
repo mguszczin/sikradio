@@ -1,6 +1,8 @@
 #ifndef RADIO_CLIENT_H
 #define RADIO_CLIENT_H
 
+#include <cstdint>
+
 #include <netdb.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -17,16 +19,6 @@
 
 namespace client {
 
-using program_arguments::ProgramArguments;
-
-using url::Url;
-
-using http::Reader;
-using http::Socket;
-using http::Writer;
-
-using client::Printer;
-
 class RadioClient {
   private:
     static constexpr size_t LISTENING_POINTS = 2;
@@ -39,17 +31,19 @@ class RadioClient {
         TlsHandshake
     };
 
-    ProgramArguments radio_args;
+    bool is_multiplexing;
+    int timeout;
+    program_arguments::IpType ip;
 
     SSL_CTX *ssl_ctx = nullptr;
     SSL *ssl = nullptr;
 
-    Reader reader;
-    Writer writer;
+    http::Reader reader;
+    http::Writer writer;
     Printer printer;
 
     ClientModes mode;
-    Url cur_url;
+    url::Url cur_url;
 
     Socket server_socket;
 
@@ -80,12 +74,13 @@ class RadioClient {
      * @throws `std::runtime_error` if function can't connect
      * to given url.
      */
-    void establish_connection(const Url &url, struct pollfd &poll_fd);
+    void establish_connection(const url::Url &url, struct pollfd &poll_fd);
 
   public:
-    RadioClient(ProgramArguments args)
-        : radio_args(std::move(args)), reader(), writer(), printer(),
-          cur_url(radio_args.url_address)
+    RadioClient(bool is_multiplexing, int timeout, program_arguments::IpType ip,
+                url::Url cur_url)
+        : is_multiplexing(is_multiplexing), timeout(timeout), ip(ip), reader(),
+          writer(), printer(), cur_url(std::move(cur_url))
     {
         SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
         SSL_CTX_set_default_verify_paths(ctx);

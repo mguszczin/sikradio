@@ -63,7 +63,7 @@ void RadioClient::set_up_addrinfo(struct addrinfo &hints) const
     memset(&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;
 
-    switch (radio_args.ip) {
+    switch (ip) {
     case IpType::IPv4:
         hints.ai_family = AF_INET;
         break;
@@ -153,7 +153,7 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     ParsedHttpResponse response = parse_http_response(headers);
 
     if (response.status == ParsedStatus::HTTP_OK) {
-        if (radio_args.is_multiplexing) {
+        if (is_multiplexing) {
             if (!response.icy_metaint.has_value()) {
                 throw runtime_error(format("Multiplexing is ON, but no "
                                            "`icy-metaint` header found:\n{}",
@@ -178,8 +178,8 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
 
     Url new_url = parse_url(response.location.value());
 
-    string new_request = get_http_request_string(
-        new_url, radio_args.is_multiplexing, response.cookie);
+    string new_request =
+        get_http_request_string(new_url, is_multiplexing, response.cookie);
 
     writer.change_buffer(new_request);
     establish_connection(new_url, poll_fd);
@@ -282,8 +282,6 @@ bool RadioClient::handle_user_input(const pollfd &poll_fd)
         if (getline(cin, line)) {
             if (line == QUIT_MESSAGE) {
                 return true;
-            } else if (radio_args.verb == Verbosity::Debug) {
-                cerr << line << endl;
             }
         } else {
             // this is not the expected behaviour remember that when
@@ -309,7 +307,7 @@ void RadioClient::start()
     array<struct pollfd, LISTENING_POINTS> poll_fds{};
 
     writer.change_buffer(
-        get_http_request_string(cur_url, radio_args.is_multiplexing, nullopt));
+        get_http_request_string(cur_url, is_multiplexing, nullopt));
 
     poll_fds[INPUT_FD].fd = STDIN_FILENO;
     poll_fds[INPUT_FD].events = POLLIN;
@@ -317,7 +315,7 @@ void RadioClient::start()
     establish_connection(cur_url, poll_fds[SERVER_FD]);
 
     while (1) {
-        int status = poll(poll_fds.data(), poll_fds.size(), radio_args.timeout);
+        int status = poll(poll_fds.data(), poll_fds.size(), timeout);
 
         if (status < 0) {
             if (errno == EINTR) {

@@ -15,6 +15,7 @@ using std::logic_error;
 using std::stoi;
 using std::string;
 
+using log::parse_verbosity;
 using log::Verbosity;
 
 using program_arguments::ProgramArguments;
@@ -39,26 +40,6 @@ int parse_timeout(const string &arg)
                    MAX_TIME));
     }
     return timeout_val;
-}
-
-Verbosity parse_verbosity(const string &arg)
-{
-    static constexpr int MIN_VERB = 0;
-    static constexpr int MAX_VERB = 4;
-    int v_val{};
-
-    try {
-        v_val = stoi(arg);
-    } catch (const logic_error &) {
-        throw invalid_argument("Option -v requires a numeric value.");
-    }
-
-    if (v_val < MIN_VERB || v_val > MAX_VERB) {
-        throw invalid_argument(
-            format("Option -v: verbosity must be between {} and {}.", MIN_VERB,
-                   MAX_VERB));
-    }
-    return static_cast<Verbosity>(v_val);
 }
 
 } // namespace

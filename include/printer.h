@@ -1,6 +1,7 @@
 #ifndef PRINTER_H
 #define PRINTER_H
 
+#include <cstdint>
 #include <string>
 
 namespace client {

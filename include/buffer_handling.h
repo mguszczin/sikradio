@@ -1,7 +1,9 @@
 #ifndef WRITER_H
 #define WRITER_H
 
+#include <cstdint>
 #include <string>
+#include <utility>
 
 #include <poll.h>
 

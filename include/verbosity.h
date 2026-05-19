@@ -3,6 +3,7 @@
 
 #include <format>
 #include <iostream>
+#include <string>
 #include <utility>
 
 namespace log {
@@ -50,6 +51,8 @@ inline void debug(std::format_string<Args...> fmt, Args &&...args)
         std::cout << "[DEBUG] " << std::format(fmt, std::forward<Args>(args)...)
                   << std::endl;
 }
+
+Verbosity parse_verbosity(const std::string &arg);
 
 } // namespace log
 
