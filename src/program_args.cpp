@@ -5,16 +5,21 @@
 #include <string>
 #include <unistd.h>
 
+#include "url.h"
+#include "verbosity.h"
+
 namespace {
-
-using program_arguments::ProgramArguments;
-using program_arguments::Verbosity;
-
 using std::format;
 using std::invalid_argument;
 using std::logic_error;
 using std::stoi;
 using std::string;
+
+using log::Verbosity;
+
+using program_arguments::ProgramArguments;
+
+using url::parse_url;
 
 int parse_timeout(const string &arg)
 {
@@ -43,7 +48,7 @@ Verbosity parse_verbosity(const string &arg)
     int v_val{};
 
     try {
-        int v_val = stoi(arg);
+        v_val = stoi(arg);
     } catch (const logic_error &) {
         throw invalid_argument("Option -v requires a numeric value.");
     }
@@ -60,46 +65,41 @@ Verbosity parse_verbosity(const string &arg)
 
 namespace program_arguments {
 
-ProgramArguments get_args(int argc, char *argv[])
+[[nodiscard]] ProgramArguments get_args(int argc, char *argv[])
 {
     ProgramArguments args{};
     int opt{};
-    string url_str{};
-    IpType type = IpType::Default;
-    Verbosity verb = Verbosity::Warning;
-    bool is_multiplexing = false;
-    int timeout{5000};
 
     opterr = 0;
 
     while ((opt = getopt(argc, argv, "u:mt:46v:q")) != -1) {
         switch (opt) {
         case 'u':
-            url_str = optarg;
+            args.url_address = optarg;
             break;
 
         case 'm':
-            is_multiplexing = true;
+            args.is_multiplexing = true;
             break;
 
         case 't':
-            timeout = parse_timeout(optarg);
+            args.timeout = parse_timeout(optarg);
             break;
 
         case '4':
-            type = IpType::IPv4;
+            args.ip = IpType::IPv4;
             break;
 
         case '6':
-            type = IpType::IPv6;
+            args.ip = IpType::IPv6;
             break;
 
         case 'v':
-            verb = parse_verbosity(optarg);
+            args.verb = parse_verbosity(optarg);
             break;
 
         case 'q':
-            verb = Verbosity::Quiet;
+            args.verb = Verbosity::Quiet;
             break;
 
         case '?':
@@ -121,15 +121,11 @@ ProgramArguments get_args(int argc, char *argv[])
         throw invalid_argument("Unexpected positional arguments found.");
     }
 
-    if (!url_str.empty()) {
+    if (args.url_address.empty()) {
         throw invalid_argument("Missing required parameter: -u <url>");
     }
 
-    return ProgramArguments{.url_address = url::parse_url(url_str),
-                            .ip = type,
-                            .verb = verb,
-                            .is_multiplexing = is_multiplexing,
-                            .timeout = timeout};
+    return args;
 }
 
 } // namespace program_arguments
