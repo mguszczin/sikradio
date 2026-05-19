@@ -22,7 +22,14 @@ struct ProgramArguments {
     int timeout{5000};
 };
 
-[[nodiscard]] ProgramArguments get_args(int argc, char *argv[]);
+/**
+ * Function reads arguments from `argv`. Assumes the arguments are in the same
+ * format as program arguments.
+ *
+ * @throws `std::invalid_argument` if no url (-u flag) is specified or if flags
+ * are not used correctly.
+ */
+[[nodiscard]] ProgramArguments get_args(int argc, char *const argv[]);
 
 } // namespace program_arguments
 

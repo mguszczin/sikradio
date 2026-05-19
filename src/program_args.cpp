@@ -65,7 +65,7 @@ Verbosity parse_verbosity(const string &arg)
 
 namespace program_arguments {
 
-[[nodiscard]] ProgramArguments get_args(int argc, char *argv[])
+[[nodiscard]] ProgramArguments get_args(int argc, char *const argv[])
 {
     ProgramArguments args{};
     int opt{};
