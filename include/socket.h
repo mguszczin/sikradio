@@ -2,6 +2,7 @@
 #define SOCKET_H
 
 #include <unistd.h>
+#include <verbosity.h>
 
 namespace http {
 
@@ -19,9 +20,11 @@ class Socket {
 
     Socket &operator=(Socket &&other) noexcept
     {
-        if (this != &other) {
-            if (fd >= 0)
+        if (this != &other && other.fd != fd) {
+            if (fd >= 0) {
+                logs::debug("closing desc number {} in assignment", fd);
                 close(fd);
+            }
             fd = other.fd;
             other.fd = -1;
         }
@@ -31,6 +34,7 @@ class Socket {
     ~Socket()
     {
         if (fd >= 0) {
+            logs::debug("closing desc number {} in desc", fd);
             close(fd);
         }
     }

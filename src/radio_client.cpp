@@ -244,11 +244,13 @@ bool RadioClient::handle_tls_handshake(struct pollfd &poll_fd)
 
 void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
 {
-    auto [sockfd, status] = connector.start_looking();
-
-    if (sockfd != -1) {
-        server_socket = std::move(sockfd);
+    auto [socketfd, status] = connector.start_looking();
+    logs::debug("What about now this is sever socket: {}", int(server_socket));
+    if (socketfd.is_valid()) {
+        server_socket = std::move(socketfd);
     }
+
+    logs::debug("Getting new desc see if closed");
 
     switch (status) {
     case ConnectState::Found:
@@ -259,6 +261,7 @@ void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
         poll_fd.fd = server_socket;
         poll_fd.events = POLLOUT;
         mode = ClientModes::Connecting;
+        logs::debug("for some reason after leaving this we get closing desc");
         break;
 
     case ConnectState::NotFound:
@@ -272,10 +275,6 @@ void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
 
 bool RadioClient::handle_server_comunication(pollfd &poll_fd)
 {
-    if (poll_fd.revents == 0) {
-        return false;
-    }
-
     if (mode == ClientModes::Connecting) {
         handle_connecting_to_socket(poll_fd);
         return false;
@@ -380,6 +379,7 @@ void RadioClient::start()
     poll_fds[INPUT_FD].events = POLLIN;
 
     establish_connection(poll_fds[SERVER_FD]);
+    logs::debug("closed here right?");
     logs::server_info("{}", request.substr(0, request.size() - 2));
 
     while (1) {

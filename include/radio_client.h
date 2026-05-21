@@ -51,7 +51,7 @@ class RadioClient {
     url::Url cur_url;
     std::chrono::milliseconds time_passed{0};
 
-    int server_socket;
+    http::Socket server_socket;
 
     void handle_succesful_connection(struct pollfd &poll_fd);
     /**

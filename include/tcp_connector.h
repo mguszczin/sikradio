@@ -30,7 +30,7 @@ class TcpConnector {
     TcpConnector &operator=(const TcpConnector &) = delete;
 
     void init(const url::Url &url);
-    std::pair<http::Socket, ConnectState> start_looking();
+    std::pair<http::Socket, ConnectState> start_looking() noexcept;
 };
 
 } // namespace client
