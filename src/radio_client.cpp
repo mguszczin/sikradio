@@ -102,94 +102,20 @@ string get_peer_address(int sockfd)
 
 namespace client {
 
-void RadioClient::set_up_addrinfo(struct addrinfo &hints) const noexcept
+void RadioClient::handle_succesful_connection(struct pollfd &poll_fd)
 {
-    memset(&hints, 0, sizeof hints);
-    hints.ai_socktype = SOCK_STREAM;
+    logs::server_info("connecting to server {}",
+                      get_peer_address(server_socket));
 
-    switch (ip) {
-    case IpType::IPv4:
-        hints.ai_family = AF_INET;
-        break;
-    case IpType::IPv6:
-        hints.ai_family = AF_INET6;
-        break;
-    case IpType::Default:
-    default:
-        hints.ai_family = AF_UNSPEC;
-        break;
-    }
-}
+    poll_fd.fd = server_socket;
 
-int RadioClient::connect_to_socket(const struct addrinfo *res) const
-{
-    int sockfd{-1};
-    for (const struct addrinfo *p = res; p != nullptr; p = p->ai_next) {
-        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sockfd == -1)
-            continue;
-
-        if (fcntl(sockfd, F_SETFL, O_NONBLOCK) == -1) {
-            close(sockfd);
-            continue;
-        }
-        int status = connect(sockfd, p->ai_addr, p->ai_addrlen);
-
-        if (status == 0) {
-            break;
-        }
-
-        if (errno == EINPROGRESS)
-            break;
-
-        close(sockfd);
-        sockfd = -1;
-    }
-    return sockfd;
-}
-
-void RadioClient::establish_connection(const Url &url, struct pollfd &poll_fd)
-{
-    logs::server_info("{}\nresolving name {}", get_current_timestamp(),
-                      url.address);
-
-    if (ssl != nullptr) {
-        SSL_free(ssl);
-        ssl = nullptr;
-    }
-
-    struct addrinfo hints, *res;
-    set_up_addrinfo(hints);
-    string port_str = to_string(url.port);
-
-    int status =
-        getaddrinfo(url.address.c_str(), port_str.c_str(), &hints, &res);
-    if (status != 0) {
-        throw runtime_error(format("Failed to resolve host '{}:{}': {}",
-                                   url.address, url.port,
-                                   gai_strerror(status)));
-    }
-    server_socket = Socket{};
-    int sockfd = connect_to_socket(res);
-    freeaddrinfo(res);
-
-    if (sockfd == -1) {
-        throw runtime_error(
-            format("Could not connect to '{}:{}'", url.address, url.port));
-    }
-
-    logs::server_info("connecting to server {}", get_peer_address(sockfd));
-
-    server_socket = Socket{sockfd};
-    poll_fd.fd = sockfd;
-
-    if (url.is_https) {
+    if (cur_url.is_https) {
         ssl = SSL_new(ssl_ctx);
         if (!ssl) {
             throw runtime_error("Failed to create SSL object structure");
         }
         SSL_set_fd(ssl, server_socket);
-        SSL_set_tlsext_host_name(ssl, url.address.c_str());
+        SSL_set_tlsext_host_name(ssl, cur_url.address.c_str());
 
         poll_fd.events = POLLIN | POLLOUT;
         mode = ClientModes::TlsHandshake;
@@ -198,6 +124,22 @@ void RadioClient::establish_connection(const Url &url, struct pollfd &poll_fd)
 
     poll_fd.events = POLLOUT;
     mode = ClientModes::SendingData;
+}
+// UPGRADE EVERYWHERE CUR_URL
+void RadioClient::establish_connection(struct pollfd &poll_fd)
+{
+    logs::server_info("{}\nresolving name {}", get_current_timestamp(),
+                      cur_url.address);
+
+    if (ssl != nullptr) {
+        SSL_free(ssl);
+        ssl = nullptr;
+    }
+
+    server_socket = Socket{};
+    connector.init(cur_url);
+
+    handle_connecting_to_socket(poll_fd);
 }
 
 void RadioClient::handle_new_headers(struct pollfd &poll_fd,
@@ -235,7 +177,7 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
         get_http_request_string(cur_url, is_multiplexing, response.cookie);
 
     writer.change_buffer(new_request);
-    establish_connection(cur_url, poll_fd);
+    establish_connection(poll_fd);
 
     logs::server_info("{}", new_request.substr(0, new_request.size() - 2));
 
@@ -300,23 +242,64 @@ bool RadioClient::handle_tls_handshake(struct pollfd &poll_fd)
     }
 }
 
+void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
+{
+    auto [sockfd, status] = connector.start_looking();
+
+    if (sockfd != -1) {
+        server_socket = std::move(sockfd);
+    }
+
+    switch (status) {
+    case ConnectState::Found:
+        handle_succesful_connection(poll_fd);
+        break;
+
+    case ConnectState::Connecting:
+        poll_fd.fd = server_socket;
+        poll_fd.events = POLLOUT;
+        mode = ClientModes::Connecting;
+        break;
+
+    case ConnectState::NotFound:
+    default:
+        throw runtime_error(
+            format("Connection failed: No valid IP addresses found or "
+                   "reachable for '{}:{}'",
+                   cur_url.address, cur_url.port));
+    }
+}
+
 bool RadioClient::handle_server_comunication(pollfd &poll_fd)
 {
-    if (poll_fd.revents & (POLLHUP))
+    if (poll_fd.revents == 0) {
+        return false;
+    }
+
+    if (mode == ClientModes::Connecting) {
+        handle_connecting_to_socket(poll_fd);
+        return false;
+    }
+
+    if (poll_fd.revents & (POLLHUP)) {
         return true;
+    }
 
     if (poll_fd.revents & (POLLERR)) {
         int error = 0;
         socklen_t errlen = sizeof(error);
 
-        if (getsockopt(poll_fd.fd, SOL_SOCKET, SO_ERROR, &error, &errlen) == 0)
+        if (getsockopt(poll_fd.fd, SOL_SOCKET, SO_ERROR, &error, &errlen) ==
+            0) {
             throw runtime_error(format("POLLERR on fd {}: {} (error code : {})",
                                        poll_fd.fd, strerror(error), error));
-        else
+        } else {
             throw runtime_error(format(
                 "POLLERR on fd {}: Failed to extract error via getsockopt",
                 poll_fd.fd));
+        }
     }
+
     switch (mode) {
     case ClientModes::SendingData:
         return handle_sending_request(poll_fd);
@@ -332,12 +315,13 @@ bool RadioClient::handle_server_comunication(pollfd &poll_fd)
 
     default:
         throw invalid_argument(
-            "Wrong enum inside `handle_server_communication`");
+            "Wrong enum inside `handle_server_comunication`");
     }
 }
 
 bool RadioClient::handle_user_input(pollfd &poll_fd)
 {
+
     if (poll_fd.revents & POLLERR) {
         throw std::runtime_error("poll() reported POLLERR on standard input.");
     }
@@ -377,7 +361,7 @@ void RadioClient::handle_timeout(struct pollfd &poll_fd)
     reader.restart();
     writer.restart();
 
-    establish_connection(cur_url, poll_fd);
+    establish_connection(poll_fd);
 
     string request = get_http_request_string(cur_url, is_multiplexing, nullopt);
     writer.change_buffer(request);
@@ -395,7 +379,7 @@ void RadioClient::start()
     poll_fds[INPUT_FD].fd = STDIN_FILENO;
     poll_fds[INPUT_FD].events = POLLIN;
 
-    establish_connection(cur_url, poll_fds[SERVER_FD]);
+    establish_connection(poll_fds[SERVER_FD]);
     logs::server_info("{}", request.substr(0, request.size() - 2));
 
     while (1) {

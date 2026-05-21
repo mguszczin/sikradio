@@ -26,11 +26,11 @@ using url::Url;
 } // namespace
 
 namespace client {
-AsyncConnector::AsyncConnector(IpType ip) : ip_type(ip), given_fd(-1) {}
+TcpConnector::TcpConnector(IpType ip) : ip_type(ip), given_fd(-1) {}
 
-AsyncConnector::~AsyncConnector() { cleanup(); }
+TcpConnector::~TcpConnector() { cleanup(); }
 
-void AsyncConnector::init(const Url &url)
+void TcpConnector::init(const Url &url)
 {
     cleanup();
     struct addrinfo hints;
@@ -48,17 +48,13 @@ void AsyncConnector::init(const Url &url)
     current_addr = addr_list_head;
 }
 
-pair<Socket, ConnectState> AsyncConnector::start_looking()
+pair<Socket, ConnectState> TcpConnector::start_looking()
 {
     if (given_fd != -1) {
         int error = 0;
         socklen_t errlen = sizeof(error);
         if (getsockopt(given_fd, SOL_SOCKET, SO_ERROR, &error, &errlen) < 0) {
             error = errno;
-        }
-
-        if (error == EINPROGRESS || error == EALREADY) {
-            return {Socket(-1), ConnectState::Connecting};
         }
 
         if (error == 0) {
@@ -105,7 +101,7 @@ pair<Socket, ConnectState> AsyncConnector::start_looking()
     return {Socket(-1), ConnectState::NotFound};
 }
 
-void AsyncConnector::cleanup()
+void TcpConnector::cleanup()
 {
     given_fd = -1;
     if (addr_list_head != nullptr) {
@@ -115,7 +111,7 @@ void AsyncConnector::cleanup()
     }
 }
 
-void AsyncConnector::set_up_addrinfo(struct addrinfo &hints) const noexcept
+void TcpConnector::set_up_addrinfo(struct addrinfo &hints) const noexcept
 {
     memset(&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;

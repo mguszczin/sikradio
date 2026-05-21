@@ -17,6 +17,7 @@
 #include "printer.h"
 #include "program_args.h"
 #include "socket.h"
+#include "tcp_connector.h"
 #include "url.h"
 
 namespace client {
@@ -28,10 +29,10 @@ class RadioClient {
 
     enum class ClientModes {
         Connecting,
+        TlsHandshake,
         SendingData,
         ReadingHeaders,
         ReadingBody,
-        TlsHandshake
     };
 
     bool is_multiplexing;
@@ -41,6 +42,7 @@ class RadioClient {
     SSL_CTX *ssl_ctx = nullptr;
     SSL *ssl = nullptr;
 
+    TcpConnector connector;
     http::Reader reader;
     http::Writer writer;
     Printer printer;
@@ -51,10 +53,7 @@ class RadioClient {
 
     int server_socket;
 
-    int connect_to_socket(const struct addrinfo *res) const noexcept;
-
-    void set_up_addrinfo(struct addrinfo &hints) const noexcept;
-
+    void handle_succesful_connection(struct pollfd &poll_fd);
     /**
      * Establishes connection with server under `cur_url`
      * and returns socket descriptor to that url.
@@ -62,7 +61,11 @@ class RadioClient {
      * @throws `std::runtime_error` if function can't connect
      * to given url.
      */
-    void establish_connection(const url::Url &url, struct pollfd &poll_fd);
+    void establish_connection(struct pollfd &poll_fd);
+
+    // void handle_http_move(struct pollfd &poll, const std::string &headers);
+
+    // void handle_http_ok(struct pollfd &poll, const std::string &headers);
 
     void handle_new_headers(struct pollfd &poll, const std::string &headers);
 
@@ -78,13 +81,16 @@ class RadioClient {
 
     bool handle_tls_handshake(struct pollfd &poll_fd);
 
+    void handle_connecting_to_socket(struct pollfd &poll_fd);
+
     void handle_timeout(struct pollfd &poll_fd);
 
   public:
     RadioClient(bool is_multiplexing, int timeout, program_arguments::IpType ip,
                 url::Url cur_url)
-        : is_multiplexing(is_multiplexing), timeout(timeout), ip(ip), reader(),
-          writer(), printer(), cur_url(std::move(cur_url))
+        : is_multiplexing(is_multiplexing), timeout(timeout), ip(ip),
+          connector(ip), reader(), writer(), printer(),
+          cur_url(std::move(cur_url))
     {
         ssl_ctx = SSL_CTX_new(TLS_client_method());
         SSL_CTX_set_default_verify_paths(ssl_ctx);

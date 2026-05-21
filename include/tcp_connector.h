@@ -12,7 +12,7 @@ namespace client {
 
 enum class ConnectState { Found, NotFound, Connecting };
 
-class AsyncConnector {
+class TcpConnector {
   private:
     void cleanup();
     void set_up_addrinfo(struct addrinfo &hints) const noexcept;
@@ -23,11 +23,11 @@ class AsyncConnector {
     struct addrinfo *current_addr = nullptr;
 
   public:
-    explicit AsyncConnector(program_arguments::IpType ip);
-    ~AsyncConnector();
+    explicit TcpConnector(program_arguments::IpType ip);
+    ~TcpConnector();
 
-    AsyncConnector(const AsyncConnector &) = delete;
-    AsyncConnector &operator=(const AsyncConnector &) = delete;
+    TcpConnector(const TcpConnector &) = delete;
+    TcpConnector &operator=(const TcpConnector &) = delete;
 
     void init(const url::Url &url);
     std::pair<http::Socket, ConnectState> start_looking();
