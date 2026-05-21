@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 #include <netdb.h>
@@ -37,6 +38,7 @@ class RadioClient {
 
     bool is_multiplexing;
     int timeout;
+    std::optional<std::string> cur_cookie{std::nullopt};
     program_arguments::IpType ip;
 
     SSL_CTX *ssl_ctx = nullptr;
@@ -49,9 +51,11 @@ class RadioClient {
 
     ClientModes mode;
     url::Url cur_url;
-    std::chrono::milliseconds time_passed{0};
+    std::chrono::milliseconds last_time_connected{0};
 
     http::Socket server_socket;
+
+    void start_sending_data(struct pollfd &poll_fd);
 
     void handle_succesful_connection(struct pollfd &poll_fd);
     /**
