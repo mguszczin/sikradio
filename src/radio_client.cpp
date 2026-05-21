@@ -121,7 +121,7 @@ void RadioClient::set_up_addrinfo(struct addrinfo &hints) const noexcept
     }
 }
 
-int RadioClient::connect_to_socket(const struct addrinfo *res) const noexcept
+int RadioClient::connect_to_socket(const struct addrinfo *res) const
 {
     int sockfd{-1};
     for (const struct addrinfo *p = res; p != nullptr; p = p->ai_next) {
@@ -129,7 +129,17 @@ int RadioClient::connect_to_socket(const struct addrinfo *res) const noexcept
         if (sockfd == -1)
             continue;
 
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == 0)
+        if (fcntl(sockfd, F_SETFL, O_NONBLOCK) == -1) {
+            close(sockfd);
+            continue;
+        }
+        int status = connect(sockfd, p->ai_addr, p->ai_addrlen);
+
+        if (status == 0) {
+            break;
+        }
+
+        if (errno == EINPROGRESS)
             break;
 
         close(sockfd);
@@ -159,7 +169,7 @@ void RadioClient::establish_connection(const Url &url, struct pollfd &poll_fd)
                                    url.address, url.port,
                                    gai_strerror(status)));
     }
-
+    server_socket = Socket{};
     int sockfd = connect_to_socket(res);
     freeaddrinfo(res);
 
@@ -170,13 +180,7 @@ void RadioClient::establish_connection(const Url &url, struct pollfd &poll_fd)
 
     logs::server_info("connecting to server {}", get_peer_address(sockfd));
 
-    if (fcntl(sockfd, F_SETFL, O_NONBLOCK) == -1) {
-        throw system_error(errno, generic_category(),
-                           "Failed to set socket to non-blocking");
-    }
-
     server_socket = Socket{sockfd};
-
     poll_fd.fd = sockfd;
 
     if (url.is_https) {

@@ -1,6 +1,7 @@
 #ifndef RADIO_CLIENT_H
 #define RADIO_CLIENT_H
 
+#include <chrono>
 #include <cstdint>
 #include <string_view>
 
@@ -26,6 +27,7 @@ class RadioClient {
     static constexpr std::string_view QUIT_MESSAGE = "quit";
 
     enum class ClientModes {
+        Connecting,
         SendingData,
         ReadingHeaders,
         ReadingBody,
@@ -45,8 +47,9 @@ class RadioClient {
 
     ClientModes mode;
     url::Url cur_url;
+    std::chrono::milliseconds time_passed{0};
 
-    http::Socket server_socket;
+    int server_socket;
 
     int connect_to_socket(const struct addrinfo *res) const noexcept;
 

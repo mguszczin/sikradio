@@ -240,13 +240,27 @@ string get_http_request_string(const Url &url, bool is_multiplex,
 
     string icy_header = is_multiplex ? "Icy-MetaData: 1\r\n" : "";
 
+    string host_value;
+    if (url.address.find(':') != string::npos) {
+        host_value = format("[{}]", url.address);
+    } else {
+        host_value = url.address;
+    }
+
+    bool is_default_port =
+        (url.is_https && url.port == 443) || (!url.is_https && url.port == 80);
+
+    if (!is_default_port) {
+        host_value += format(":{}", url.port);
+    }
+
     return format("GET {} HTTP/1.1\r\n"
                   "Host: {}\r\n"
                   "Connection: Keep-Alive\r\n"
                   "{}"
                   "{}"
                   "\r\n",
-                  url.path, url.address, cookie_header, icy_header);
+                  url.path, host_value, cookie_header, icy_header);
 }
 
 } // namespace http
