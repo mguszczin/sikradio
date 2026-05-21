@@ -102,6 +102,17 @@ string get_peer_address(int sockfd)
 
 namespace client {
 
+void RadioClient::start_sending_data(struct pollfd &poll_fd)
+{
+    poll_fd.events = POLLOUT;
+    mode = ClientModes::SendingData;
+
+    string request =
+        get_http_request_string(cur_url, is_multiplexing, cur_cookie);
+    writer.change_buffer(request);
+    logs::server_info("{}", request.substr(0, request.size() - 2));
+}
+
 void RadioClient::handle_succesful_connection(struct pollfd &poll_fd)
 {
     logs::server_info("connecting to server {}",
@@ -109,23 +120,22 @@ void RadioClient::handle_succesful_connection(struct pollfd &poll_fd)
 
     poll_fd.fd = server_socket;
 
-    if (cur_url.is_https) {
-        ssl = SSL_new(ssl_ctx);
-        if (!ssl) {
-            throw runtime_error("Failed to create SSL object structure");
-        }
-        SSL_set_fd(ssl, server_socket);
-        SSL_set_tlsext_host_name(ssl, cur_url.address.c_str());
-
-        poll_fd.events = POLLIN | POLLOUT;
-        mode = ClientModes::TlsHandshake;
+    if (!cur_url.is_https) {
+        start_sending_data(poll_fd);
         return;
     }
 
-    poll_fd.events = POLLOUT;
-    mode = ClientModes::SendingData;
+    ssl = SSL_new(ssl_ctx);
+    if (!ssl) {
+        throw runtime_error("Failed to create SSL object structure");
+    }
+    SSL_set_fd(ssl, server_socket);
+    SSL_set_tlsext_host_name(ssl, cur_url.address.c_str());
+
+    poll_fd.events = POLLIN | POLLOUT;
+    mode = ClientModes::TlsHandshake;
 }
-// UPGRADE EVERYWHERE CUR_URL
+
 void RadioClient::establish_connection(struct pollfd &poll_fd)
 {
     logs::server_info("{}\nresolving name {}", get_current_timestamp(),
@@ -172,14 +182,8 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     }
 
     cur_url = parse_url(response.location.value());
-
-    string new_request =
-        get_http_request_string(cur_url, is_multiplexing, response.cookie);
-
-    writer.change_buffer(new_request);
+    cur_cookie = response.cookie;
     establish_connection(poll_fd);
-
-    logs::server_info("{}", new_request.substr(0, new_request.size() - 2));
 
     return;
 }
@@ -221,8 +225,7 @@ bool RadioClient::handle_tls_handshake(struct pollfd &poll_fd)
 {
     int ret = SSL_connect(ssl);
     if (ret == 1) {
-        mode = ClientModes::SendingData;
-        poll_fd.events = POLLOUT;
+        start_sending_data(poll_fd);
         return false;
     }
 
@@ -361,10 +364,6 @@ void RadioClient::handle_timeout(struct pollfd &poll_fd)
     writer.restart();
 
     establish_connection(poll_fd);
-
-    string request = get_http_request_string(cur_url, is_multiplexing, nullopt);
-    writer.change_buffer(request);
-    logs::server_info("{}", request.substr(0, request.size() - 2));
 }
 
 void RadioClient::start()
@@ -372,18 +371,23 @@ void RadioClient::start()
     static constexpr size_t INPUT_FD = 0, SERVER_FD = 1;
     array<struct pollfd, LISTENING_POINTS> poll_fds{};
 
-    string request = get_http_request_string(cur_url, is_multiplexing, nullopt);
-    writer.change_buffer(request);
-
     poll_fds[INPUT_FD].fd = STDIN_FILENO;
     poll_fds[INPUT_FD].events = POLLIN;
 
     establish_connection(poll_fds[SERVER_FD]);
-    logs::debug("closed here right?");
-    logs::server_info("{}", request.substr(0, request.size() - 2));
+    auto last_server_activity = std::chrono::steady_clock::now();
 
     while (1) {
-        int status = poll(poll_fds.data(), poll_fds.size(), timeout);
+
+        auto cur_time = std::chrono::steady_clock::now();
+
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           cur_time - last_server_activity)
+                           .count();
+        int remaining_timeout = timeout - static_cast<int>(elapsed);
+
+        int status = poll(poll_fds.data(), poll_fds.size(),
+                          (remaining_timeout < 0) ? 0 : remaining_timeout);
 
         if (status < 0) {
             if (errno == EINTR) {
@@ -395,12 +399,16 @@ void RadioClient::start()
 
         if (status == 0) {
             handle_timeout(poll_fds[SERVER_FD]);
+            last_server_activity = std::chrono::steady_clock::now();
             continue;
         }
 
         if (handle_user_input(poll_fds[INPUT_FD]) ||
             handle_server_comunication(poll_fds[SERVER_FD]))
             break;
+
+        if (poll_fds[SERVER_FD].revents)
+            last_server_activity = std::chrono::steady_clock::now();
     }
 }
 
