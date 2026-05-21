@@ -375,10 +375,19 @@ void RadioClient::start()
     poll_fds[INPUT_FD].events = POLLIN;
 
     establish_connection(poll_fds[SERVER_FD]);
-    logs::debug("closed here right?");
+    auto last_server_activity = std::chrono::steady_clock::now();
 
     while (1) {
-        int status = poll(poll_fds.data(), poll_fds.size(), timeout);
+
+        auto cur_time = std::chrono::steady_clock::now();
+
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                           cur_time - last_server_activity)
+                           .count();
+        int remaining_timeout = timeout - static_cast<int>(elapsed);
+
+        int status = poll(poll_fds.data(), poll_fds.size(),
+                          (remaining_timeout < 0) ? 0 : remaining_timeout);
 
         if (status < 0) {
             if (errno == EINTR) {
@@ -390,12 +399,16 @@ void RadioClient::start()
 
         if (status == 0) {
             handle_timeout(poll_fds[SERVER_FD]);
+            last_server_activity = std::chrono::steady_clock::now();
             continue;
         }
 
         if (handle_user_input(poll_fds[INPUT_FD]) ||
             handle_server_comunication(poll_fds[SERVER_FD]))
             break;
+
+        if (poll_fds[SERVER_FD].revents)
+            last_server_activity = std::chrono::steady_clock::now();
     }
 }
 
