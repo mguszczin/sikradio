@@ -11,7 +11,6 @@
 #include <unistd.h>
 
 #include "socket.h"
-#include "verbosity.h"
 
 namespace {
 
@@ -47,15 +46,11 @@ void TcpConnector::init(const Url &url)
     }
 
     current_addr = addr_list_head;
-    logs::debug("given fd after init {}", given_fd);
 }
 
 pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
 {
-    logs::debug("call now");
-    logs::debug("given fd1: {}", given_fd);
     if (given_fd != -1) {
-        logs::debug("Trying to connect... ");
         int error = 0;
         socklen_t errlen = sizeof(error);
         if (getsockopt(given_fd, SOL_SOCKET, SO_ERROR, &error, &errlen) < 0) {
@@ -66,8 +61,7 @@ pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
             cleanup();
             return {Socket(-1), ConnectState::Found};
         }
-        logs::debug("Fd: {}", given_fd);
-        logs::debug("Got error: {} ({})", error, strerror(error));
+
         given_fd = -1;
         if (current_addr != nullptr) {
             current_addr = current_addr->ai_next;
@@ -97,7 +91,6 @@ pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
 
         if (errno == EINPROGRESS) {
             given_fd = sockfd;
-            logs::debug("Set Given fd: {}", given_fd);
             return {std::move(sockfd), ConnectState::Connecting};
         }
 

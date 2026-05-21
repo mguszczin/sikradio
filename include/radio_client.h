@@ -26,7 +26,7 @@ namespace client {
 class RadioClient {
   private:
     static constexpr size_t LISTENING_POINTS = 2;
-    static constexpr std::string_view QUIT_MESSAGE = "quit";
+    static constexpr std::string_view QUIT_MESSAGE = "quit\n";
 
     enum class ClientModes {
         Connecting,

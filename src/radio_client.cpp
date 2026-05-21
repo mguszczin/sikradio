@@ -1,5 +1,6 @@
 #include "radio_client.h"
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <chrono>
@@ -50,6 +51,7 @@ using std::format;
 using std::generic_category;
 using std::getline;
 using std::invalid_argument;
+using std::max;
 using std::nullopt;
 using std::optional;
 using std::range_error;
@@ -208,6 +210,9 @@ bool RadioClient::handle_reading_headers(pollfd &poll_fd)
         logs::server_info("{}", pot_headers.value().substr(
                                     0, pot_headers.value().size() - 2));
         handle_new_headers(poll_fd, pot_headers.value());
+    } else if (!pot_headers && response == SocketStatus::ConnectionClosed) {
+        throw std::runtime_error(
+            "Server closed connection without sending headers");
     }
 
     return (response == SocketStatus::ConnectionClosed);
@@ -283,10 +288,6 @@ bool RadioClient::handle_server_comunication(pollfd &poll_fd)
         return false;
     }
 
-    if (poll_fd.revents & (POLLHUP)) {
-        return true;
-    }
-
     if (poll_fd.revents & (POLLERR)) {
         int error = 0;
         socklen_t errlen = sizeof(error);
@@ -328,31 +329,43 @@ bool RadioClient::handle_user_input(pollfd &poll_fd)
         throw std::runtime_error("poll() reported POLLERR on standard input.");
     }
 
-    if (poll_fd.revents & POLLHUP) {
-        logs::debug("Standard input disconnected (POLLHUP). Continuing "
-                    "background playback.");
-        poll_fd.fd = -1;
-        return false;
-    }
+    static std::string partial_input;
 
     if (poll_fd.revents & POLLIN) {
-        string line;
+        array<char, max(static_cast<size_t>(1024), QUIT_MESSAGE.size())> buffer;
+        ssize_t n = read(poll_fd.fd, buffer.data(), sizeof(buffer) - 1);
 
-        if (getline(cin, line)) {
-            if (line == QUIT_MESSAGE) {
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+                return false;
+            throw std::system_error(errno, std::generic_category(),
+                                    "Read from stdin failed");
+        }
+
+        if (n > 0) {
+            partial_input.append(buffer.data(), n);
+
+            logs::debug("Current stdin: '{}'", partial_input);
+
+            if (partial_input.find("quit") != string::npos) {
                 return true;
             }
-        } else {
-            if (cin.eof()) {
-                logs::debug("Standard input reached EOF. Continuing playback.");
-                poll_fd.fd = -1;
-                return false;
-            } else {
-                throw std::runtime_error(
-                    "std::getline failed with a stream error.");
+
+            if (partial_input.size() > buffer.size()) {
+                size_t keep = QUIT_MESSAGE.size() - 1;
+                partial_input.erase(0, partial_input.size() - keep);
             }
+        } else if (n == 0) {
+            poll_fd.fd = -1;
         }
     }
+
+    if (poll_fd.revents & POLLHUP) {
+        logs::warning("Standard input disconnected (POLLHUP). Continuing "
+                      "background playback.");
+        poll_fd.fd = -1;
+    }
+
     return false;
 }
 
@@ -371,6 +384,10 @@ void RadioClient::start()
     static constexpr size_t INPUT_FD = 0, SERVER_FD = 1;
     array<struct pollfd, LISTENING_POINTS> poll_fds{};
 
+    if (fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) < 0) {
+        throw std::system_error(errno, std::generic_category(),
+                                "Failed to set stdin to non-block");
+    }
     poll_fds[INPUT_FD].fd = STDIN_FILENO;
     poll_fds[INPUT_FD].events = POLLIN;
 
@@ -403,8 +420,10 @@ void RadioClient::start()
             continue;
         }
 
-        if (handle_user_input(poll_fds[INPUT_FD]) ||
-            handle_server_comunication(poll_fds[SERVER_FD]))
+        if (handle_user_input(poll_fds[INPUT_FD]))
+            break;
+
+        if (handle_server_comunication(poll_fds[SERVER_FD]))
             break;
 
         if (poll_fds[SERVER_FD].revents)

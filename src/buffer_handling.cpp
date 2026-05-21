@@ -105,10 +105,6 @@ SocketStatus Writer::write_using_http(const struct pollfd &pfd)
             return SocketStatus::Continuing;
         }
 
-        if (errno == EPIPE || errno == ECONNRESET) {
-            return SocketStatus::ConnectionClosed;
-        }
-
         throw system_error(errno, generic_category(),
                            "Failed to write to socket");
     }
@@ -146,7 +142,7 @@ SocketStatus Writer::write_using_https(struct pollfd &pfd, SSL *ssl)
         return SocketStatus::Continuing;
 
     case SslOperationResult::Closed:
-        return SocketStatus::ConnectionClosed;
+        throw runtime_error("Connection closed during ssl handshake");
 
     default:
         throw runtime_error("Unexpected SSL operation result during write");
@@ -213,7 +209,7 @@ SocketStatus Reader::read_using_https(struct pollfd &pfd, SSL *ssl)
         return SocketStatus::Continuing;
 
     case SslOperationResult::Closed:
-        return SocketStatus::ConnectionClosed;
+        throw runtime_error("Connection closed during ssl handshake");
 
     default:
         throw runtime_error("Unexpected SSL operation result during read");
