@@ -120,18 +120,20 @@ void RadioClient::handle_succesful_connection(struct pollfd &poll_fd)
 
     poll_fd.fd = server_socket;
 
-    if (cur_url.is_https) {
-        ssl = SSL_new(ssl_ctx);
-        if (!ssl) {
-            throw runtime_error("Failed to create SSL object structure");
-        }
-        SSL_set_fd(ssl, server_socket);
-        SSL_set_tlsext_host_name(ssl, cur_url.address.c_str());
-
-        poll_fd.events = POLLIN | POLLOUT;
-        mode = ClientModes::TlsHandshake;
+    if (!cur_url.is_https) {
+        start_sending_data(poll_fd);
         return;
     }
+
+    ssl = SSL_new(ssl_ctx);
+    if (!ssl) {
+        throw runtime_error("Failed to create SSL object structure");
+    }
+    SSL_set_fd(ssl, server_socket);
+    SSL_set_tlsext_host_name(ssl, cur_url.address.c_str());
+
+    poll_fd.events = POLLIN | POLLOUT;
+    mode = ClientModes::TlsHandshake;
 }
 
 void RadioClient::establish_connection(struct pollfd &poll_fd)
