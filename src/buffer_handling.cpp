@@ -16,6 +16,8 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include "verbosity.h"
+
 namespace {
 using std::array;
 using std::generic_category;
@@ -174,6 +176,7 @@ SocketStatus Reader::read_using_http(const struct pollfd &pfd)
 
     if (status > 0) {
         buffer.append(reading_buffer.begin(), reading_buffer.begin() + status);
+        logs::debug("\nCurrent buffer:\n{}\nFinish", buffer);
         return SocketStatus::Continuing;
     } else if (status == 0) {
         return SocketStatus::ConnectionClosed;
@@ -232,8 +235,7 @@ optional<string> Reader::try_to_fetch_header()
     size_t pos = buffer.find(DOUBLE_CRLF);
 
     if (pos == string::npos) {
-        throw runtime_error(
-            "HTTP headers exceeded maximum allowed size without termination");
+        throw runtime_error("Something went wrong");
     }
 
     size_t split_point = pos + DOUBLE_CRLF.length();
@@ -263,8 +265,6 @@ bool Reader::can_extract_header() noexcept
     last_time_asked = buffer.size();
 
     if (pos != string_view::npos) {
-        is_header_present = true;
-    } else if (buffer.size() >= 2 * PAGE_SIZE) {
         is_header_present = true;
     }
 

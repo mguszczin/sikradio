@@ -46,12 +46,12 @@ class Reader {
     SocketStatus read_using_https(struct pollfd &poll_fd, SSL *ssl);
     SocketStatus read_using_http(const struct pollfd &poll_fd);
 
+    bool can_extract_header() noexcept;
+
   public:
     SocketStatus read_from_socket(struct pollfd &poll_fd, SSL *ssl);
 
     std::string restart() noexcept;
-
-    bool can_extract_header() noexcept;
 
     std::optional<std::string> try_to_fetch_header();
 

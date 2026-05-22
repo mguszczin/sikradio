@@ -49,8 +49,10 @@ class RadioClient {
     http::Writer writer;
     Printer printer;
 
-    ClientModes mode;
+    const url::Url orginal_url;
     url::Url cur_url;
+
+    ClientModes mode;
     std::chrono::milliseconds last_time_connected{0};
 
     http::Socket server_socket;
@@ -91,10 +93,10 @@ class RadioClient {
 
   public:
     RadioClient(bool is_multiplexing, int timeout, program_arguments::IpType ip,
-                url::Url cur_url)
+                url::Url url)
         : is_multiplexing(is_multiplexing), timeout(timeout), ip(ip),
-          connector(ip), reader(), writer(), printer(),
-          cur_url(std::move(cur_url))
+          connector(ip), reader(), writer(), printer(), orginal_url(url),
+          cur_url(std::move(url))
     {
         ssl_ctx = SSL_CTX_new(TLS_client_method());
         SSL_CTX_set_default_verify_paths(ssl_ctx);

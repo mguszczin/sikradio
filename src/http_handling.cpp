@@ -31,12 +31,16 @@ using http::ParsedStatus;
 
 using url::Url;
 
+#include <cctype>
+
+// ...
+
 ParsedStatus check_response_line_parts(string_view protocol,
                                        string_view status_code,
                                        string_view reason_phrase)
 {
     if (protocol.empty() || status_code.empty() || reason_phrase.empty()) {
-        throw invalid_argument("Response line parts cannot be empty.");
+        throw invalid_argument("Protocol and status code cannot be empty.");
     }
 
     if (protocol != "HTTP/1.0" && protocol != "HTTP/1.1" && protocol != "ICY") {
@@ -44,9 +48,10 @@ ParsedStatus check_response_line_parts(string_view protocol,
             format("Unsupported or invalid protocol: '{}'", protocol));
     }
 
-    if (status_code.size() != 3) {
-        throw invalid_argument(
-            format("Status code must be exactly 3 digits: '{}'", status_code));
+    if (status_code.size() != 3 || !std::isdigit(status_code[0]) ||
+        !std::isdigit(status_code[1]) || !std::isdigit(status_code[2])) {
+        throw invalid_argument(format(
+            "Status code must be exactly 3 numeric digits: '{}'", status_code));
     }
 
     char first_digit = status_code[0];
@@ -56,9 +61,7 @@ ParsedStatus check_response_line_parts(string_view protocol,
             return ParsedStatus::HTTP_OK;
         }
     } else if (first_digit == '3') {
-        if (status_code == "301" || status_code == "302") {
-            return ParsedStatus::HTTP_MOVED;
-        }
+        return ParsedStatus::HTTP_MOVED;
     }
 
     throw invalid_argument(

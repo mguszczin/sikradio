@@ -112,6 +112,7 @@ void RadioClient::start_sending_data(struct pollfd &poll_fd)
     string request =
         get_http_request_string(cur_url, is_multiplexing, cur_cookie);
     writer.change_buffer(request);
+    logs::debug("Server got connection and starts sending data.");
     logs::server_info("{}", request.substr(0, request.size() - 2));
 }
 
@@ -140,6 +141,7 @@ void RadioClient::handle_succesful_connection(struct pollfd &poll_fd)
 
 void RadioClient::establish_connection(struct pollfd &poll_fd)
 {
+    logs::debug("Establishig connection...");
     logs::server_info("{}\nresolving name {}", get_current_timestamp(),
                       cur_url.address);
 
@@ -161,20 +163,19 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
 
     if (response.status == ParsedStatus::HTTP_OK) {
         if (is_multiplexing) {
-            if (!response.icy_metaint.has_value()) {
-                throw runtime_error(format("Multiplexing is ON, but no "
-                                           "`icy-metaint` header found:\n{}",
-                                           headers));
-            }
-            if (response.icy_metaint.value() == 0) {
-                throw range_error(format("Invalid `icy-metaint` value of 0 "
-                                         "received from server:\n{}",
-                                         headers));
-            }
-            printer.set_metaint(response.icy_metaint.value());
+            if (!response.icy_metaint.has_value() ||
+                response.icy_metaint.value() == 0) {
+                printer.set_metaint(-1);
+
+                logs::warning(
+                    "Multiplexing requested but server does not support it or "
+                    "sent metaint=0. Degrading to raw audio.");
+            } else
+                printer.set_metaint(response.icy_metaint.value());
         }
         printer.print(reader.restart());
         mode = ClientModes::ReadingBody;
+        logs::debug("Reading body after parsing headers");
         return;
     }
 
@@ -185,6 +186,8 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
 
     cur_url = parse_url(response.location.value());
     cur_cookie = response.cookie;
+    logs::debug("New redirect to url: {}", response.location.value());
+
     establish_connection(poll_fd);
 
     return;
@@ -198,7 +201,7 @@ bool RadioClient::handle_sending_request(pollfd &poll_fd)
         poll_fd.events = POLLIN;
     }
 
-    return (response == SocketStatus::ConnectionClosed);
+    return false;
 }
 
 bool RadioClient::handle_reading_headers(pollfd &poll_fd)
@@ -222,7 +225,7 @@ bool RadioClient::handle_reading_body(pollfd &poll_fd)
 {
     auto response = reader.read_from_socket(poll_fd, ssl);
     printer.print(reader.restart());
-
+    logs::debug("Reading body");
     return (response == SocketStatus::ConnectionClosed);
 }
 
@@ -253,15 +256,15 @@ bool RadioClient::handle_tls_handshake(struct pollfd &poll_fd)
 void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
 {
     auto [socketfd, status] = connector.start_looking();
-    logs::debug("What about now this is sever socket: {}", int(server_socket));
     if (socketfd.is_valid()) {
         server_socket = std::move(socketfd);
     }
 
-    logs::debug("Getting new desc see if closed");
+    logs::debug("Checking for status of connection");
 
     switch (status) {
     case ConnectState::Found:
+        logs::debug("Connection found");
         handle_succesful_connection(poll_fd);
         break;
 
@@ -269,7 +272,7 @@ void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
         poll_fd.fd = server_socket;
         poll_fd.events = POLLOUT;
         mode = ClientModes::Connecting;
-        logs::debug("for some reason after leaving this we get closing desc");
+        logs::debug("In connecting state");
         break;
 
     case ConnectState::NotFound:
@@ -347,7 +350,7 @@ bool RadioClient::handle_user_input(pollfd &poll_fd)
 
             logs::debug("Current stdin: '{}'", partial_input);
 
-            if (partial_input.find("quit") != string::npos) {
+            if (partial_input.find(QUIT_MESSAGE) != string::npos) {
                 return true;
             }
 
@@ -375,7 +378,8 @@ void RadioClient::handle_timeout(struct pollfd &poll_fd)
 
     reader.restart();
     writer.restart();
-
+    cur_url = orginal_url;
+    cur_cookie = nullopt;
     establish_connection(poll_fd);
 }
 
@@ -417,12 +421,14 @@ void RadioClient::start()
         if (status == 0) {
             handle_timeout(poll_fds[SERVER_FD]);
             last_server_activity = std::chrono::steady_clock::now();
+            logs::debug("Mode after timout: {}", static_cast<int>(mode));
             continue;
         }
 
         if (handle_user_input(poll_fds[INPUT_FD]))
             break;
-
+        logs::debug("Now handle server communication");
+        logs::debug("Mode : {}", static_cast<int>(mode));
         if (handle_server_comunication(poll_fds[SERVER_FD]))
             break;
 
