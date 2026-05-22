@@ -1,6 +1,7 @@
 #ifndef HTTP_HANDLING_H
 #define HTTP_HANDLING_H
 
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -18,7 +19,7 @@ enum class ParsedStatus { HTTP_OK, HTTP_MOVED };
 struct ParsedHttpResponse {
     ParsedStatus status;
     std::optional<std::string> location;
-    std::optional<std::string> cookie;
+    std::map<std::string, std::string> cookies;
     std::optional<size_t> icy_metaint;
 };
 
@@ -34,8 +35,9 @@ ParsedHttpResponse parse_http_response(std::string_view http_request);
 /**
  * @brief Generates a raw HTTP GET request formatted string.
  */
-std::string get_http_request_string(const url::Url &url, bool is_multiplex,
-                                    std::optional<std::string> cookie);
+std::string
+get_http_request_string(const url::Url &url, bool is_multiplex,
+                        const std::map<std::string, std::string> &cookies);
 
 } // namespace http
 

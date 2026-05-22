@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string_view>
 
@@ -38,7 +39,7 @@ class RadioClient {
 
     bool is_multiplexing;
     int timeout;
-    std::optional<std::string> cur_cookie{std::nullopt};
+    std::map<std::string, std::string> cur_cookies;
     program_arguments::IpType ip;
 
     SSL_CTX *ssl_ctx = nullptr;

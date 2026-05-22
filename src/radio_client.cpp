@@ -110,7 +110,7 @@ void RadioClient::start_sending_data(struct pollfd &poll_fd)
     mode = ClientModes::SendingData;
 
     string request =
-        get_http_request_string(cur_url, is_multiplexing, cur_cookie);
+        get_http_request_string(cur_url, is_multiplexing, cur_cookies);
     writer.change_buffer(request);
     logs::debug("Server got connection and starts sending data.");
     logs::server_info("{}", request.substr(0, request.size() - 2));
@@ -185,7 +185,7 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     }
 
     cur_url = parse_url(response.location.value());
-    cur_cookie = response.cookie;
+    cur_cookies = response.cookies;
     logs::debug("New redirect to url: {}", response.location.value());
 
     establish_connection(poll_fd);
@@ -379,7 +379,7 @@ void RadioClient::handle_timeout(struct pollfd &poll_fd)
     reader.restart();
     writer.restart();
     cur_url = orginal_url;
-    cur_cookie = nullopt;
+    cur_cookies.clear();
     establish_connection(poll_fd);
 }
 

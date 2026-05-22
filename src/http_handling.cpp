@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <format>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -17,6 +18,7 @@ using std::errc;
 using std::format;
 using std::from_chars;
 using std::invalid_argument;
+using std::map;
 using std::nullopt;
 using std::optional;
 using std::stoull;
@@ -107,7 +109,7 @@ ParsedStatus parse_response_line(string_view response_line)
 
 string to_lower_string(string_view sv)
 {
-    string result(sv);
+    string result{sv};
     transform(result.begin(), result.end(), result.begin(),
               [](unsigned char c) { return tolower(c); });
     return result;
@@ -124,6 +126,24 @@ string_view strip(string_view sv)
 
     size_t end = sv.find_last_not_of(whitespace);
     return sv.substr(start, end - start + 1);
+}
+
+void add_cookies(map<string, string> &cookies, string_view value)
+{
+    size_t semi_pos = value.find(';');
+    if (semi_pos != string_view::npos) {
+        value = value.substr(0, semi_pos);
+    }
+
+    size_t eq_pos = value.find('=');
+    if (eq_pos != string_view::npos) {
+        string_view cookie_key = strip(value.substr(0, eq_pos));
+        string_view cookie_val = strip(value.substr(eq_pos + 1));
+
+        if (!cookie_key.empty()) {
+            cookies[string(cookie_key)] = string(cookie_val);
+        }
+    }
 }
 
 void process_header(ParsedHttpResponse &result, string_view key,
@@ -146,10 +166,9 @@ void process_header(ParsedHttpResponse &result, string_view key,
     string key_lower = to_lower_string(key);
 
     if (key_lower == HEADER_LOCATION) {
-        result.location = string(value);
+        result.location = string{value};
     } else if (key_lower == HEADER_SET_COOKIE) {
-        string_view cookie_view = value.substr(0, value.find(';'));
-        result.cookie = string(strip(cookie_view));
+        add_cookies(result.cookies, value);
     } else if (key_lower == HEADER_ICY_METAINT) {
         size_t metaint_val;
 
@@ -201,10 +220,9 @@ void process_header(ParsedHttpResponse &result, string_view key,
             "Content type wasn't present inside the HTTP OK response");
 
     logs::debug(
-        "Parsed Http Response: status: {}, location: {}, cookie: {}, "
+        "Parsed Http Response: status: {}, location: {},"
         "icy_metaint: {}",
         static_cast<int>(result.status), result.location.value_or("none"),
-        result.cookie.value_or("none"),
         result.icy_metaint.has_value() ? std::to_string(*result.icy_metaint)
                                        : "none");
     return result;
@@ -236,10 +254,22 @@ ParsedHttpResponse parse_http_response(string_view http_response)
 }
 
 string get_http_request_string(const Url &url, bool is_multiplex,
-                               optional<string> cookie)
+                               const map<string, string> &cookies)
 {
-    string cookie_header =
-        cookie.has_value() ? format("Cookie: {}\r\n", cookie.value()) : "";
+    string cookie_header;
+
+    if (!cookies.empty()) {
+        cookie_header = "Cookie: ";
+        bool first = true;
+        for (const auto &[key, val] : cookies) {
+            if (!first) {
+                cookie_header += "; ";
+            }
+            cookie_header += format("{}={}", key, val);
+            first = false;
+        }
+        cookie_header += "\r\n";
+    }
 
     string icy_header = is_multiplex ? "Icy-MetaData: 1\r\n" : "";
 
