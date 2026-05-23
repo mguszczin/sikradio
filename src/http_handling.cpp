@@ -18,6 +18,7 @@ using std::errc;
 using std::format;
 using std::from_chars;
 using std::invalid_argument;
+using std::isdigit;
 using std::map;
 using std::nullopt;
 using std::optional;
@@ -50,8 +51,8 @@ ParsedStatus check_response_line_parts(string_view protocol,
             format("Unsupported or invalid protocol: '{}'", protocol));
     }
 
-    if (status_code.size() != 3 || !std::isdigit(status_code[0]) ||
-        !std::isdigit(status_code[1]) || !std::isdigit(status_code[2])) {
+    if (status_code.size() != 3 || !isdigit(status_code[0]) ||
+        !isdigit(status_code[1]) || !isdigit(status_code[2])) {
         throw invalid_argument(format(
             "Status code must be exactly 3 numeric digits: '{}'", status_code));
     }
@@ -273,18 +274,9 @@ string get_http_request_string(const Url &url, bool is_multiplex,
 
     string icy_header = is_multiplex ? "Icy-MetaData: 1\r\n" : "";
 
-    string host_value;
-    if (url.address.find(':') != string::npos) {
-        host_value = format("[{}]", url.address);
-    } else {
-        host_value = url.address;
-    }
-
-    bool is_default_port =
-        (url.is_https && url.port == 443) || (!url.is_https && url.port == 80);
-
-    if (!is_default_port) {
-        host_value += format(":{}", url.port);
+    string host_val = url.address;
+    if (host_val.find(':') != string::npos && host_val.front() != '[') {
+        host_val = format("[{}]", host_val);
     }
 
     return format("GET {} HTTP/1.1\r\n"
@@ -293,7 +285,7 @@ string get_http_request_string(const Url &url, bool is_multiplex,
                   "{}"
                   "{}"
                   "\r\n",
-                  url.path, host_value, cookie_header, icy_header);
+                  url.path, host_val, cookie_header, icy_header);
 }
 
 } // namespace http

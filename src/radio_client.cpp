@@ -185,9 +185,12 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     }
 
     cur_url = parse_url(response.location.value());
-    cur_cookies = response.cookies;
+    /* Fast merging of two maps, we treat new cookies as more important (they
+     * can overwrite old cookies) */
+    response.cookies.merge(cur_cookies);
+    cur_cookies = std::move(response.cookies);
     logs::debug("New redirect to url: {}", response.location.value());
-
+    reader.restart();
     establish_connection(poll_fd);
 
     return;
