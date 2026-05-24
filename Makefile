@@ -1,7 +1,7 @@
 CXX = g++
-BUILD_DIR = .
-SRC_DIR = .
-INCLUDE_DIR = .
+BUILD_DIR = build
+SRC_DIR = src
+INCLUDE_DIR = include
 
 CXX_FLAGS = -std=c++23 -O2 -Wall -Wextra
 CPPFLAGS = -I$(INCLUDE_DIR) -MMD -MP
