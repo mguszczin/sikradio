@@ -11,7 +11,7 @@
 #include <poll.h>
 #include <sys/socket.h>
 
-#include "http_handling.h" // Needed for http::DOUBLE_CRLF
+#include "http_handling.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>

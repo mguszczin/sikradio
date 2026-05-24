@@ -36,8 +36,6 @@ using url::Url;
 
 #include <cctype>
 
-// ...
-
 ParsedStatus check_response_line_parts(string_view protocol,
                                        string_view status_code,
                                        string_view reason_phrase)

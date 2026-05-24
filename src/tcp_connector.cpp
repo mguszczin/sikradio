@@ -7,7 +7,7 @@
 #include <string>
 
 #include <fcntl.h>
-#include <netdb.h> // Moved here from the header
+#include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
 

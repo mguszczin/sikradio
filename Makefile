@@ -1,8 +1,7 @@
 CXX = g++
-
-BUILD_DIR = build
-SRC_DIR = src
-INCLUDE_DIR = include
+BUILD_DIR = .
+SRC_DIR = .
+INCLUDE_DIR = .
 
 CXX_FLAGS = -std=c++23 -O2 -Wall -Wextra
 CPPFLAGS = -I$(INCLUDE_DIR) -MMD -MP
@@ -19,7 +18,7 @@ DEPS = $(SRC_OBJ:.o=.d)
 all: $(TARGET)
 
 $(TARGET): $(SRC_OBJ)
-	$(CXX) $(CXX_FLAGS) $(LD_FLAGS) -o $@ $^
+	$(CXX) $(CXX_FLAGS) -o $@ $^ $(LD_FLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
@@ -28,4 +27,4 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 -include $(DEPS)
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -f $(SRC_OBJ) $(DEPS) $(TARGET)
