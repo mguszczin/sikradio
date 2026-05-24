@@ -8,7 +8,7 @@
 namespace url {
 
 /**
- * Structure representing url address.
+ * Holds the extracted components of a successfully parsed URL.
  */
 struct Url {
     std::string address;
@@ -18,13 +18,14 @@ struct Url {
 };
 
 /**
- * @brief Parses `std::string_view` to `Url` struct.
+ * @brief Parses a raw URL string into its structural components.
  *
- * Accepts only `http` and `https` protocols. If no port is specified inside
- * `url` function assigns default port to the host (80 to http and 443 to
- * https).
  *
- * @throws `std::invalid_argument` is url does not meet the RFC standards
+ * @throws `std::invalid_argument` if:
+ * - The protocol is missing or anything other than "http://" or "https://".
+ * - The host address is missing (e.g., "http:///path").
+ * - The IPv6 address is malformed (missing brackets or misplaced colons).
+ * - The custom port provided is not a valid number.
  */
 [[nodiscard]] Url parse_url(std::string_view url);
 

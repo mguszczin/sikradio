@@ -85,18 +85,15 @@ string get_peer_address(int sockfd)
     }
 
     char ipstr[INET6_ADDRSTRLEN];
-    int port;
 
     if (addr.ss_family == AF_INET) {
         struct sockaddr_in *s = (struct sockaddr_in *)&addr;
-        port = ntohs(s->sin_port);
         inet_ntop(AF_INET, &s->sin_addr, ipstr, sizeof ipstr);
-        return format("{}:{}", ipstr, port);
+        return format("{}", ipstr);
     } else {
         struct sockaddr_in6 *s = (struct sockaddr_in6 *)&addr;
-        port = ntohs(s->sin6_port);
         inet_ntop(AF_INET6, &s->sin6_addr, ipstr, sizeof ipstr);
-        return format("[{}]:{}", ipstr, port);
+        return format("[{}]", ipstr);
     }
 }
 
@@ -165,7 +162,7 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     if (response.status == ParsedStatus::HTTP_OK) {
         if (is_multiplexing) {
             if (!response.icy_metaint.has_value() ||
-                response.icy_metaint.value() == 0) {
+                response.icy_metaint.value() <= 0) {
                 printer.set_metaint(-1);
 
                 logs::warning(
@@ -382,8 +379,8 @@ void RadioClient::handle_timeout(struct pollfd &poll_fd)
     establish_connection(poll_fd);
 }
 
-int RadioClient::calc_timeout(std::chrono::_V2::steady_clock::time_point
-                                  last_server_activity) const noexcept
+int RadioClient::calc_timeout(
+    std::chrono::steady_clock::time_point last_server_activity) const noexcept
 {
     auto cur_time = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -408,7 +405,6 @@ void RadioClient::start()
     auto last_server_activity = std::chrono::steady_clock::now();
 
     while (1) {
-
         int remaining_timeout = calc_timeout(last_server_activity);
         int status = poll(poll_fds.data(), poll_fds.size(),
                           (remaining_timeout < 0) ? 0 : remaining_timeout);

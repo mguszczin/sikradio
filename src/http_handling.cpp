@@ -58,12 +58,15 @@ ParsedStatus check_response_line_parts(string_view protocol,
     }
 
     char first_digit = status_code[0];
+    char second_digit = status_code[1];
+    char third_digit = status_code[2];
 
     if (first_digit == '2') {
         if (status_code == "200") {
             return ParsedStatus::HTTP_OK;
         }
-    } else if (first_digit == '3') {
+    } else if (first_digit == '3' && second_digit == '0' &&
+               third_digit >= '0' && third_digit <= '8') {
         return ParsedStatus::HTTP_MOVED;
     }
 

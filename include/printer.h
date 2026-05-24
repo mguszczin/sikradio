@@ -3,9 +3,17 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace client {
 
+/**
+ * Handles the separation and output of audio and metadata streams.
+ * * If multiplexing is disabled (metaint <= 0), it dumps all data to stdout.
+ * If multiplexing is enabled (Icecast/SHOUTcast protocol), it counts the
+ * bytes, extracts the metadata blocks, prints them to stderr, and passes
+ * the pure audio to stdout.
+ */
 class Printer {
   private:
     int meta_int;
@@ -14,9 +22,9 @@ class Printer {
     bool expecting_meta_length;
     std::string current_metadata;
 
-    void process_audio(const std::string &buffer, size_t &i) noexcept;
-    void process_meta_length(const std::string &buffer, size_t &i) noexcept;
-    void process_metadata(const std::string &buffer, size_t &i);
+    void process_audio(std::string_view buffer, size_t &i) noexcept;
+    void process_meta_length(std::string_view buffer, size_t &i) noexcept;
+    void process_metadata(std::string_view buffer, size_t &i);
 
   public:
     Printer(int metaint = -1)
@@ -25,14 +33,24 @@ class Printer {
     {
     }
 
+    /**
+     * Updates the multiplexing interval (metaint).
+     * Passing a value <= 0 disables metadata parsing.
+     */
     void set_metaint(int c) noexcept { meta_int = c; }
 
     /**
-     * Prints the buffer to stdout (audio) and stderr (metadata),
-     * taking metaint into account.
+     * Processes a chunk of data received from the network.
+     * Audio is written to standard output (stdout).
+     * Metadata is written to standard error (stderr).
+     * * @throws std::runtime_error if stdout pipe breaks.
      */
-    void print(const std::string &buffer);
+    void print(std::string_view buffer);
 
+    /**
+     * Resets the internal state machine.
+     * Should be called if the stream restarts or reconnects.
+     */
     void reset() noexcept
     {
         audio_bytes_read = 0;

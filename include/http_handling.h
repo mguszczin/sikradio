@@ -13,21 +13,27 @@ namespace http {
 inline constexpr std::string_view CRLF = "\r\n";
 inline constexpr std::string_view DOUBLE_CRLF = "\r\n\r\n";
 
-/* We only allow response in format of 3XX and 2XX */
+/**
+ * Allowed response statuses.
+ * We currently only support HTTP 200 (OK) and HTTP 3XX (Redirects/Moved).
+ */
 enum class ParsedStatus { HTTP_OK, HTTP_MOVED };
 
 /**
- * Structure representing Parsed http response. Parsed http response is allowed
- * to have:
- * - Status (see enum).
- * - A few cookies in format 'a=b'.
- * - Icy metaint which specifies metaint for multiplexing
+ * Holds the extracted data from an HTTP response.
  *
- * The given constants specify in what form the `header_tag` should be inside
- * the http response.
+ * - status: Whether the request succeeded (200) or redirected (3XX).
+ * - location: The redirect URL (only present if status is HTTP_MOVED).
+ * - cookies: Key-value pairs of any 'Set-Cookie' headers.
+ * - icy_metaint: The number of audio bytes between metadata blocks (used for
+ * Icecast).
+ *
+ * Note: The HEADER_* constants are written in lowercase because the parser
+ * converts incoming server header keys to lowercase before checking them.
  */
 struct ParsedHttpResponse {
     ParsedStatus status;
+
     static constexpr std::string_view HEADER_LOCATION = "location";
     static constexpr std::string_view HEADER_SET_COOKIE = "set-cookie";
     static constexpr std::string_view HEADER_ICY_METAINT = "icy-metaint";
@@ -38,16 +44,22 @@ struct ParsedHttpResponse {
 };
 
 /**
- * @brief Parses a complete raw HTTP response text into a structured response
- * object.
+ * @brief Parses a raw HTTP response string into a structured object.
  *
- * @throws `std::invalid_argument` If the headers are malformed, missing
- * required fields, or protocols are unsupported.
+ *
+ * @throws std::invalid_argument if:
+ * - The response is missing the double CRLF (\r\n\r\n) separator.
+ * - The protocol is not HTTP/1.0, HTTP/1.1, or ICY.
+ * - The status code is invalid, or anything other than 200 or 3XX.
+ * - The status is 200 OK, but "Content-Type: audio/mpeg" is missing.
  */
-ParsedHttpResponse parse_http_response(std::string_view http_request);
+ParsedHttpResponse parse_http_response(std::string_view http_response);
 
 /**
- * @brief Generates a raw HTTP GET request formatted string.
+ * @brief Generates a raw HTTP GET request string ready to be sent over a
+ * socket.
+ *
+ * @return The fully formatted HTTP GET request string.
  */
 std::string
 get_http_request_string(const url::Url &url, bool is_multiplex,

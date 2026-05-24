@@ -9,6 +9,7 @@
 #include "verbosity.h"
 
 namespace {
+
 using std::format;
 using std::invalid_argument;
 using std::logic_error;
@@ -18,6 +19,7 @@ using std::string;
 using logs::parse_verbosity;
 using logs::Verbosity;
 
+using program_arguments::IpType;
 using program_arguments::ProgramArguments;
 
 using url::parse_url;

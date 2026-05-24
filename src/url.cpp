@@ -10,6 +10,7 @@
 #include "verbosity.h"
 
 namespace {
+
 using std::errc;
 using std::format;
 using std::from_chars;
@@ -23,23 +24,22 @@ pair<size_t, bool> check_for_http_prefix(string_view url)
     static constexpr string_view HTTP_PREF = "http://";
     static constexpr string_view HTTPS_PREF = "https://";
 
-    if (url.starts_with(HTTP_PREF))
+    if (url.starts_with(HTTP_PREF)) {
         return {HTTP_PREF.size(), false};
-    else if (url.starts_with(HTTPS_PREF))
+    } else if (url.starts_with(HTTPS_PREF)) {
         return {HTTPS_PREF.size(), true};
-    else {
-        auto what =
+    } else {
+        throw invalid_argument(
             format("Invalid prefix of url: '{}'. Expected '{}' or '{}'.", url,
-                   HTTP_PREF, HTTPS_PREF);
-        throw invalid_argument(what);
+                   HTTP_PREF, HTTPS_PREF));
     }
 }
 
 size_t get_address_size(string_view url)
 {
-    size_t slash_pos = url.find("/");
+    size_t slash_pos = url.find('/');
 
-    if (slash_pos == string::npos) {
+    if (slash_pos == string_view::npos) {
         return url.size();
     }
 
@@ -87,9 +87,16 @@ pair<string, uint16_t> get_address_and_port(string_view host_port,
         const size_t first_colon = host_port.find(':');
         const size_t last_colon = host_port.rfind(':');
 
-        if (first_colon != string_view::npos && first_colon == last_colon) {
-            host_part = host_port.substr(0, first_colon);
-            port_part = host_port.substr(first_colon + 1);
+        if (first_colon != string_view::npos) {
+            if (first_colon == last_colon) {
+                host_part = host_port.substr(0, first_colon);
+                port_part = host_port.substr(first_colon + 1);
+            } else {
+                throw invalid_argument(
+                    format("Malformed URL: Unbracketed IPv6 address or "
+                           "multiple colons detected in '{}'",
+                           host_port));
+            }
         } else {
             host_part = host_port;
         }
@@ -132,8 +139,10 @@ namespace url {
     auto [address, port] = get_address_and_port(host_port, is_https);
 
     string_view path = url_without_http_pref.substr(slash_pos);
-    if (path.empty())
+
+    if (path.empty()) {
         path = "/";
+    }
 
     logs::debug(
         "Parsed result -> Address: '{}', Port: {}, Path: '{}', HTTPS: {}",

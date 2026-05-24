@@ -1,4 +1,5 @@
 #include "printer.h"
+
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -12,9 +13,10 @@ using std::endl;
 using std::min;
 using std::runtime_error;
 using std::string;
+using std::string_view;
 } // namespace
 
-void Printer::process_audio(const string &buffer, size_t &i) noexcept
+void Printer::process_audio(string_view buffer, size_t &i) noexcept
 {
     size_t target_meta = static_cast<size_t>(meta_int);
     size_t bytes_to_write =
@@ -30,7 +32,7 @@ void Printer::process_audio(const string &buffer, size_t &i) noexcept
     }
 }
 
-void Printer::process_meta_length(const string &buffer, size_t &i) noexcept
+void Printer::process_meta_length(string_view buffer, size_t &i) noexcept
 {
     unsigned char length_byte = static_cast<unsigned char>(buffer[i]);
     meta_bytes_to_read = length_byte * 16;
@@ -44,19 +46,19 @@ void Printer::process_meta_length(const string &buffer, size_t &i) noexcept
     }
 }
 
-void Printer::process_metadata(const string &buffer, size_t &i)
+void Printer::process_metadata(string_view buffer, size_t &i)
 {
     size_t bytes_to_read = min(buffer.size() - i, meta_bytes_to_read);
 
-    current_metadata.append(buffer, i, bytes_to_read);
+    current_metadata.append(buffer.data() + i, bytes_to_read);
 
     meta_bytes_to_read -= bytes_to_read;
     i += bytes_to_read;
 
     if (meta_bytes_to_read == 0) {
         if (!current_metadata.empty()) {
-            size_t null_pos = current_metadata.find('\0');
 
+            size_t null_pos = current_metadata.find('\0');
             if (null_pos != string::npos) {
                 current_metadata.erase(null_pos);
             }
@@ -70,13 +72,13 @@ void Printer::process_metadata(const string &buffer, size_t &i)
     }
 }
 
-void Printer::print(const string &buffer)
+void Printer::print(string_view buffer)
 {
     if (meta_int <= 0) {
         cout.write(buffer.data(), buffer.size());
 
         if (!cout) {
-            throw std::runtime_error(
+            throw runtime_error(
                 "Fatal error: Failed to write audio data to standard output "
                 "(broken pipe or stream error).");
         }
@@ -96,7 +98,7 @@ void Printer::print(const string &buffer)
         }
 
         if (!cout) {
-            throw std::runtime_error(
+            throw runtime_error(
                 "Fatal error: Failed to write audio data to standard output "
                 "during multiplexed stream parsing.");
         }
