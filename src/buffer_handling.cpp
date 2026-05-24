@@ -11,7 +11,7 @@
 #include <poll.h>
 #include <sys/socket.h>
 
-#include "http_handling.h"
+#include "http_handling.h" // Needed for http::DOUBLE_CRLF
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
@@ -19,6 +19,7 @@
 #include "verbosity.h"
 
 namespace {
+
 using std::array;
 using std::generic_category;
 using std::nullopt;
@@ -28,17 +29,15 @@ using std::string;
 using std::string_view;
 using std::system_error;
 using std::to_string;
-} // namespace
-
-namespace {
 
 enum class SslOperationResult { Success, NeedsRead, NeedsWrite, Closed };
 
 SslOperationResult evaluate_ssl_error(SSL *ssl, int return_code,
                                       bool is_reading, int fd)
 {
-    if (return_code > 0)
+    if (return_code > 0) {
         return SslOperationResult::Success;
+    }
 
     int err = SSL_get_error(ssl, return_code);
 
@@ -90,8 +89,9 @@ bool Writer::is_finished() const noexcept
 
 SocketStatus Writer::write_using_http(const struct pollfd &pfd)
 {
-    if (is_finished())
+    if (is_finished()) {
         return SocketStatus::Finished;
+    }
 
     const char *data_ptr = buffer.data() + bytes_sent;
     size_t data_len = buffer.size() - bytes_sent;
@@ -100,19 +100,14 @@ SocketStatus Writer::write_using_http(const struct pollfd &pfd)
 
     if (sent > 0) {
         bytes_sent += sent;
-
-        if (is_finished()) {
-            return SocketStatus::Finished;
-        }
-
-        return SocketStatus::Continuing;
+        return is_finished() ? SocketStatus::Finished
+                             : SocketStatus::Continuing;
     }
 
     if (sent < 0) {
         if (errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR) {
             return SocketStatus::Continuing;
         }
-
         throw system_error(errno, generic_category(),
                            "Failed to write to socket");
     }
@@ -122,8 +117,9 @@ SocketStatus Writer::write_using_http(const struct pollfd &pfd)
 
 SocketStatus Writer::write_using_https(struct pollfd &pfd, SSL *ssl)
 {
-    if (is_finished())
+    if (is_finished()) {
         return SocketStatus::Finished;
+    }
 
     const char *data_ptr = buffer.data() + bytes_sent;
     size_t data_len = buffer.size() - bytes_sent;
@@ -135,11 +131,8 @@ SocketStatus Writer::write_using_https(struct pollfd &pfd, SSL *ssl)
     switch (res) {
     case SslOperationResult::Success:
         bytes_sent += sent;
-
-        if (is_finished()) {
-            return SocketStatus::Finished;
-        }
-        return SocketStatus::Continuing;
+        return is_finished() ? SocketStatus::Finished
+                             : SocketStatus::Continuing;
 
     case SslOperationResult::NeedsRead:
         pfd.events = POLLIN;
@@ -150,7 +143,7 @@ SocketStatus Writer::write_using_https(struct pollfd &pfd, SSL *ssl)
         return SocketStatus::Continuing;
 
     case SslOperationResult::Closed:
-        throw runtime_error("Connection closed during ssl handshake");
+        return SocketStatus::ConnectionClosed;
 
     default:
         throw runtime_error("Unexpected SSL operation result during write");
@@ -159,10 +152,10 @@ SocketStatus Writer::write_using_https(struct pollfd &pfd, SSL *ssl)
 
 SocketStatus Writer::write_to_socket(struct pollfd &pfd, SSL *ssl)
 {
-    if (ssl)
+    if (ssl) {
         return write_using_https(pfd, ssl);
-    else
-        return write_using_http(pfd);
+    }
+    return write_using_http(pfd);
 }
 
 void Writer::change_buffer(std::string to_write)
@@ -180,7 +173,6 @@ SocketStatus Reader::read_using_http(const struct pollfd &pfd)
 
     if (status > 0) {
         buffer.append(reading_buffer.begin(), reading_buffer.begin() + status);
-        logs::debug("\nCurrent buffer:\n{}\nFinish", buffer);
         return SocketStatus::Continuing;
     } else if (status == 0) {
         return SocketStatus::ConnectionClosed;
@@ -198,7 +190,8 @@ SocketStatus Reader::read_using_https(struct pollfd &pfd, SSL *ssl)
 {
     array<char, PAGE_SIZE> reading_buffer;
 
-    int status = SSL_read(ssl, reading_buffer.data(), reading_buffer.size());
+    int status = SSL_read(ssl, reading_buffer.data(),
+                          static_cast<int>(reading_buffer.size()));
 
     SslOperationResult res = evaluate_ssl_error(ssl, status, true, pfd.fd);
 
@@ -216,7 +209,7 @@ SocketStatus Reader::read_using_https(struct pollfd &pfd, SSL *ssl)
         return SocketStatus::Continuing;
 
     case SslOperationResult::Closed:
-        throw runtime_error("Connection closed during ssl handshake");
+        return SocketStatus::ConnectionClosed;
 
     default:
         throw runtime_error("Unexpected SSL operation result during read");
@@ -225,24 +218,26 @@ SocketStatus Reader::read_using_https(struct pollfd &pfd, SSL *ssl)
 
 SocketStatus Reader::read_from_socket(struct pollfd &pfd, SSL *ssl)
 {
-    if (ssl)
+    if (ssl) {
         return read_using_https(pfd, ssl);
-    else
-        return read_using_http(pfd);
+    }
+    return read_using_http(pfd);
 }
 
 optional<string> Reader::try_to_fetch_header()
 {
-    if (!can_extract_header())
+    if (!can_extract_header()) {
         return nullopt;
-
-    size_t pos = buffer.find(DOUBLE_CRLF);
-
-    if (pos == string::npos) {
-        throw runtime_error("Something went wrong");
     }
 
-    size_t split_point = pos + DOUBLE_CRLF.length();
+    size_t pos = buffer.find(http::DOUBLE_CRLF);
+
+    if (pos == string::npos) {
+        throw runtime_error("Logical error: Headers found by "
+                            "can_extract_header but missing in extraction.");
+    }
+
+    size_t split_point = pos + http::DOUBLE_CRLF.length();
 
     string header = buffer.substr(0, split_point);
 
@@ -265,7 +260,7 @@ bool Reader::can_extract_header() noexcept
 {
     size_t search_start = (last_time_asked >= 3) ? last_time_asked - 3 : 0;
 
-    size_t pos = buffer.find(DOUBLE_CRLF, search_start);
+    size_t pos = buffer.find(http::DOUBLE_CRLF, search_start);
     last_time_asked = buffer.size();
 
     if (pos != string_view::npos) {

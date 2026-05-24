@@ -7,6 +7,7 @@
 #include <string>
 
 #include <fcntl.h>
+#include <netdb.h> // Moved here from the header
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -26,6 +27,7 @@ using url::Url;
 } // namespace
 
 namespace client {
+
 TcpConnector::TcpConnector(IpType ip) : ip_type(ip), given_fd(-1) {}
 
 TcpConnector::~TcpConnector() { cleanup(); }
@@ -33,6 +35,7 @@ TcpConnector::~TcpConnector() { cleanup(); }
 void TcpConnector::connect_with_new_url(const Url &url)
 {
     cleanup();
+
     struct addrinfo hints;
     set_up_addrinfo(hints);
     string port_str = to_string(url.port);
@@ -53,13 +56,14 @@ pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
     if (given_fd != -1) {
         int error = 0;
         socklen_t errlen = sizeof(error);
+
         if (getsockopt(given_fd, SOL_SOCKET, SO_ERROR, &error, &errlen) < 0) {
             error = errno;
         }
 
         if (error == 0) {
             cleanup();
-            return {Socket(-1), ConnectState::Found};
+            return {Socket{}, ConnectState::Found};
         }
 
         given_fd = -1;
@@ -71,6 +75,7 @@ pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
     while (current_addr != nullptr) {
         Socket sockfd{socket(current_addr->ai_family, current_addr->ai_socktype,
                              current_addr->ai_protocol)};
+
         if (!sockfd.is_valid()) {
             current_addr = current_addr->ai_next;
             continue;
@@ -98,7 +103,7 @@ pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
     }
 
     cleanup();
-    return {Socket(-1), ConnectState::NotFound};
+    return {Socket{}, ConnectState::NotFound};
 }
 
 void TcpConnector::cleanup() noexcept
@@ -113,7 +118,7 @@ void TcpConnector::cleanup() noexcept
 
 void TcpConnector::set_up_addrinfo(struct addrinfo &hints) const noexcept
 {
-    memset(&hints, 0, sizeof hints);
+    memset(&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_STREAM;
 
     switch (ip_type) {
