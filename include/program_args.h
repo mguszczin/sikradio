@@ -8,8 +8,12 @@
 
 namespace program_arguments {
 
+/* All possible options for specifing ip type. */
 enum class IpType { IPv4, IPv6, Default };
 
+/**
+ * Structure representing program arguments with default values already set.
+ */
 struct ProgramArguments {
 
     std::string url_address;
@@ -19,6 +23,8 @@ struct ProgramArguments {
 
     bool is_multiplexing = false;
 
+    static constexpr int MIN_TIME = 100;
+    static constexpr int MAX_TIME = 100000;
     int timeout{5000};
 };
 

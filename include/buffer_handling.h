@@ -32,8 +32,6 @@ class Writer {
 
     SocketStatus write_to_socket(struct pollfd &pfd, SSL *ssl);
 
-    void restart() noexcept;
-
     void change_buffer(std::string to_write);
 };
 
@@ -57,10 +55,6 @@ class Reader {
 
     const std::string &get_buffer() const { return buffer; }
 };
-
-enum class SslOperationResult { Success, NeedsRead, NeedsWrite, Closed };
-
-SslOperationResult evaluate_ssl_error(SSL *ssl, int return_code);
 
 } // namespace http
 

@@ -150,9 +150,6 @@ void add_cookies(map<string, string> &cookies, string_view value)
 void process_header(ParsedHttpResponse &result, string_view key,
                     string_view value, bool &is_content_mpeg_present)
 {
-    static constexpr string_view HEADER_LOCATION = "location";
-    static constexpr string_view HEADER_SET_COOKIE = "set-cookie";
-    static constexpr string_view HEADER_ICY_METAINT = "icy-metaint";
 
     static constexpr string_view HEADER_CONTENT_TYPE = "content-type";
     static constexpr string_view HEADER_CONTENT_VALUE = "audio/mpeg";
@@ -166,11 +163,11 @@ void process_header(ParsedHttpResponse &result, string_view key,
 
     string key_lower = to_lower_string(key);
 
-    if (key_lower == HEADER_LOCATION) {
+    if (key_lower == ParsedHttpResponse::HEADER_LOCATION) {
         result.location = string{value};
-    } else if (key_lower == HEADER_SET_COOKIE) {
+    } else if (key_lower == ParsedHttpResponse::HEADER_SET_COOKIE) {
         add_cookies(result.cookies, value);
-    } else if (key_lower == HEADER_ICY_METAINT) {
+    } else if (key_lower == ParsedHttpResponse::HEADER_ICY_METAINT) {
         size_t metaint_val;
 
         auto [ptr, ec] =

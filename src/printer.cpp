@@ -1,6 +1,7 @@
 #include "printer.h"
 #include <algorithm>
 #include <iostream>
+#include <stdexcept>
 
 namespace client {
 
@@ -9,10 +10,11 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::min;
+using std::runtime_error;
 using std::string;
 } // namespace
 
-void Printer::process_audio(const string &buffer, size_t &i)
+void Printer::process_audio(const string &buffer, size_t &i) noexcept
 {
     size_t target_meta = static_cast<size_t>(meta_int);
     size_t bytes_to_write =
@@ -28,7 +30,7 @@ void Printer::process_audio(const string &buffer, size_t &i)
     }
 }
 
-void Printer::process_meta_length(const string &buffer, size_t &i)
+void Printer::process_meta_length(const string &buffer, size_t &i) noexcept
 {
     unsigned char length_byte = static_cast<unsigned char>(buffer[i]);
     meta_bytes_to_read = length_byte * 16;

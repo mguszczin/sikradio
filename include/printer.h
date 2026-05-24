@@ -14,8 +14,8 @@ class Printer {
     bool expecting_meta_length;
     std::string current_metadata;
 
-    void process_audio(const std::string &buffer, size_t &i);
-    void process_meta_length(const std::string &buffer, size_t &i);
+    void process_audio(const std::string &buffer, size_t &i) noexcept;
+    void process_meta_length(const std::string &buffer, size_t &i) noexcept;
     void process_metadata(const std::string &buffer, size_t &i);
 
   public:

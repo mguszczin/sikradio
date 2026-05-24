@@ -37,8 +37,8 @@ class RadioClient {
         ReadingBody,
     };
 
-    bool is_multiplexing;
-    int timeout;
+    const bool is_multiplexing;
+    const int timeout;
     std::map<std::string, std::string> cur_cookies;
     program_arguments::IpType ip;
 
@@ -70,10 +70,6 @@ class RadioClient {
      */
     void establish_connection(struct pollfd &poll_fd);
 
-    // void handle_http_move(struct pollfd &poll, const std::string &headers);
-
-    // void handle_http_ok(struct pollfd &poll, const std::string &headers);
-
     void handle_new_headers(struct pollfd &poll, const std::string &headers);
 
     bool handle_sending_request(struct pollfd &poll);
@@ -84,13 +80,16 @@ class RadioClient {
 
     bool handle_server_comunication(struct pollfd &poll);
 
-    bool handle_user_input(struct pollfd &poll);
-
     bool handle_tls_handshake(struct pollfd &poll_fd);
 
     void handle_connecting_to_socket(struct pollfd &poll_fd);
 
+    bool handle_user_input(struct pollfd &poll);
+
     void handle_timeout(struct pollfd &poll_fd);
+
+    int calc_timeout(std::chrono::_V2::steady_clock::time_point
+                         last_server_activity) const noexcept;
 
   public:
     RadioClient(bool is_multiplexing, int timeout, program_arguments::IpType ip,

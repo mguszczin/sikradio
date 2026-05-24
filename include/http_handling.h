@@ -16,8 +16,22 @@ inline constexpr std::string_view DOUBLE_CRLF = "\r\n\r\n";
 /* We only allow response in format of 3XX and 2XX */
 enum class ParsedStatus { HTTP_OK, HTTP_MOVED };
 
+/**
+ * Structure representing Parsed http response. Parsed http response is allowed
+ * to have:
+ * - Status (see enum).
+ * - A few cookies in format 'a=b'.
+ * - Icy metaint which specifies metaint for multiplexing
+ *
+ * The given constants specify in what form the `header_tag` should be inside
+ * the http response.
+ */
 struct ParsedHttpResponse {
     ParsedStatus status;
+    static constexpr std::string_view HEADER_LOCATION = "location";
+    static constexpr std::string_view HEADER_SET_COOKIE = "set-cookie";
+    static constexpr std::string_view HEADER_ICY_METAINT = "icy-metaint";
+
     std::optional<std::string> location;
     std::map<std::string, std::string> cookies;
     std::optional<size_t> icy_metaint;

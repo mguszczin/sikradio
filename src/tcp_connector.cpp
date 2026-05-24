@@ -30,7 +30,7 @@ TcpConnector::TcpConnector(IpType ip) : ip_type(ip), given_fd(-1) {}
 
 TcpConnector::~TcpConnector() { cleanup(); }
 
-void TcpConnector::init(const Url &url)
+void TcpConnector::connect_with_new_url(const Url &url)
 {
     cleanup();
     struct addrinfo hints;
@@ -101,7 +101,7 @@ pair<Socket, ConnectState> TcpConnector::start_looking() noexcept
     return {Socket(-1), ConnectState::NotFound};
 }
 
-void TcpConnector::cleanup()
+void TcpConnector::cleanup() noexcept
 {
     given_fd = -1;
     if (addr_list_head != nullptr) {

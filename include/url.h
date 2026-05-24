@@ -7,6 +7,9 @@
 
 namespace url {
 
+/**
+ * Structure representing url address.
+ */
 struct Url {
     std::string address;
     uint16_t port;

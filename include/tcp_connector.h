@@ -10,11 +10,12 @@
 
 namespace client {
 
+/* Enum describing stages of connection to socket. */
 enum class ConnectState { Found, NotFound, Connecting };
 
 class TcpConnector {
   private:
-    void cleanup();
+    void cleanup() noexcept;
     void set_up_addrinfo(struct addrinfo &hints) const noexcept;
 
     program_arguments::IpType ip_type;
@@ -29,7 +30,7 @@ class TcpConnector {
     TcpConnector(const TcpConnector &) = delete;
     TcpConnector &operator=(const TcpConnector &) = delete;
 
-    void init(const url::Url &url);
+    void connect_with_new_url(const url::Url &url);
     std::pair<http::Socket, ConnectState> start_looking() noexcept;
 };
 

@@ -30,7 +30,9 @@ using std::system_error;
 using std::to_string;
 } // namespace
 
-namespace http {
+namespace {
+
+enum class SslOperationResult { Success, NeedsRead, NeedsWrite, Closed };
 
 SslOperationResult evaluate_ssl_error(SSL *ssl, int return_code,
                                       bool is_reading, int fd)
@@ -76,6 +78,10 @@ SslOperationResult evaluate_ssl_error(SSL *ssl, int return_code,
         throw runtime_error("Unknown SSL error code: " + to_string(err));
     }
 }
+
+} // namespace
+
+namespace http {
 
 bool Writer::is_finished() const noexcept
 {
@@ -158,8 +164,6 @@ SocketStatus Writer::write_to_socket(struct pollfd &pfd, SSL *ssl)
     else
         return write_using_http(pfd);
 }
-
-void Writer::restart() noexcept { bytes_sent = 0; }
 
 void Writer::change_buffer(std::string to_write)
 {

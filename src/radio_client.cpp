@@ -149,9 +149,10 @@ void RadioClient::establish_connection(struct pollfd &poll_fd)
         SSL_free(ssl);
         ssl = nullptr;
     }
-
+    reader.restart();
     server_socket = Socket{};
-    connector.init(cur_url);
+
+    connector.connect_with_new_url(cur_url);
 
     handle_connecting_to_socket(poll_fd);
 }
@@ -190,7 +191,6 @@ void RadioClient::handle_new_headers(struct pollfd &poll_fd,
     response.cookies.merge(cur_cookies);
     cur_cookies = std::move(response.cookies);
     logs::debug("New redirect to url: {}", response.location.value());
-    reader.restart();
     establish_connection(poll_fd);
 
     return;
@@ -259,9 +259,8 @@ bool RadioClient::handle_tls_handshake(struct pollfd &poll_fd)
 void RadioClient::handle_connecting_to_socket(pollfd &poll_fd)
 {
     auto [socketfd, status] = connector.start_looking();
-    if (socketfd.is_valid()) {
+    if (socketfd.is_valid())
         server_socket = std::move(socketfd);
-    }
 
     logs::debug("Checking for status of connection");
 
@@ -330,22 +329,22 @@ bool RadioClient::handle_server_comunication(pollfd &poll_fd)
 
 bool RadioClient::handle_user_input(pollfd &poll_fd)
 {
+    static constexpr size_t INPUT_BUFFER_SIZE = 1024;
 
-    if (poll_fd.revents & POLLERR) {
-        throw std::runtime_error("poll() reported POLLERR on standard input.");
-    }
+    if (poll_fd.revents & POLLERR)
+        throw runtime_error("poll() reported POLLERR on standard input.");
 
     static std::string partial_input;
 
     if (poll_fd.revents & POLLIN) {
-        array<char, max(static_cast<size_t>(1024), QUIT_MESSAGE.size())> buffer;
+        array<char, max(INPUT_BUFFER_SIZE, QUIT_MESSAGE.size())> buffer;
         ssize_t n = read(poll_fd.fd, buffer.data(), sizeof(buffer) - 1);
 
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
                 return false;
-            throw std::system_error(errno, std::generic_category(),
-                                    "Read from stdin failed");
+            throw system_error(errno, std::generic_category(),
+                               "Read from stdin failed");
         }
 
         if (n > 0) {
@@ -378,12 +377,19 @@ bool RadioClient::handle_user_input(pollfd &poll_fd)
 void RadioClient::handle_timeout(struct pollfd &poll_fd)
 {
     logs::server_info("data receiving timeout");
-
-    reader.restart();
-    writer.restart();
     cur_url = orginal_url;
     cur_cookies.clear();
     establish_connection(poll_fd);
+}
+
+int RadioClient::calc_timeout(std::chrono::_V2::steady_clock::time_point
+                                  last_server_activity) const noexcept
+{
+    auto cur_time = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       cur_time - last_server_activity)
+                       .count();
+    return timeout - static_cast<int>(elapsed);
 }
 
 void RadioClient::start()
@@ -403,13 +409,7 @@ void RadioClient::start()
 
     while (1) {
 
-        auto cur_time = std::chrono::steady_clock::now();
-
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                           cur_time - last_server_activity)
-                           .count();
-        int remaining_timeout = timeout - static_cast<int>(elapsed);
-
+        int remaining_timeout = calc_timeout(last_server_activity);
         int status = poll(poll_fds.data(), poll_fds.size(),
                           (remaining_timeout < 0) ? 0 : remaining_timeout);
 
@@ -430,8 +430,10 @@ void RadioClient::start()
 
         if (handle_user_input(poll_fds[INPUT_FD]))
             break;
+
         logs::debug("Now handle server communication");
         logs::debug("Mode : {}", static_cast<int>(mode));
+
         if (handle_server_comunication(poll_fds[SERVER_FD]))
             break;
 

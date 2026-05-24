@@ -6,6 +6,9 @@
 
 namespace http {
 
+/**
+ * Socket class that utilizes RAII to ensure proper socket deallocation.
+ */
 class Socket {
   private:
     int fd;
@@ -40,7 +43,7 @@ class Socket {
     }
 
     operator int() const { return fd; }
-    bool is_valid() const { return fd >= 0; }
+    bool is_valid() const noexcept { return fd >= 0; }
 };
 
 } // namespace http

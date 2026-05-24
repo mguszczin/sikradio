@@ -24,8 +24,6 @@ using url::parse_url;
 
 int parse_timeout(const string &arg)
 {
-    static constexpr int MIN_TIME = 100;
-    static constexpr int MAX_TIME = 100000;
     int timeout_val{};
 
     try {
@@ -34,10 +32,11 @@ int parse_timeout(const string &arg)
         throw invalid_argument("Option -t requires a numeric value.");
     }
 
-    if (timeout_val < MIN_TIME || timeout_val > MAX_TIME) {
+    if (timeout_val < ProgramArguments::MIN_TIME ||
+        timeout_val > ProgramArguments::MAX_TIME) {
         throw invalid_argument(
-            format("Option -t: timeout must be between {} and {} ms.", MIN_TIME,
-                   MAX_TIME));
+            format("Option -t: timeout must be between {} and {} ms.",
+                   ProgramArguments::MIN_TIME, ProgramArguments::MAX_TIME));
     }
     return timeout_val;
 }
